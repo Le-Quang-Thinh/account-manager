@@ -1,0 +1,66 @@
+/* ===== ảnh nền + lớp phủ tối + bề mặt thẻ =====
+   Ảnh rất rối và nhiều màu nên không đặt chữ trực tiếp lên ảnh:
+   1) lớp phủ đen 70-82% làm dịu ảnh, 2) mọi khung nội dung là thẻ đen mờ có blur, viền cyan mảnh. */
+body{
+  background:var(--bg) url("../assets/background.webp") 68% center / cover no-repeat fixed;
+}
+body::before{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(ellipse at 50% 0%,rgba(143,40,147,.22),transparent 60%),
+    linear-gradient(rgba(0,0,1,.7),rgba(3,1,3,.82));
+}
+
+h1{text-shadow:0 2px 18px rgba(0,0,1,.9)}
+.sub,.hint,.note{text-shadow:0 1px 8px rgba(0,0,1,.85)}
+
+/* thanh trên cùng và khung nội dung */
+.topbar{background:rgba(8,3,13,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--edge)}
+.pane,.toolbar,.sec,.trayx,.tbl-wrap,.empty{backdrop-filter:blur(6px)}
+.pane,.toolbar,.trayx{border-color:var(--edge)}
+.menu,.modal{background:#0B0610;border-color:var(--edge);backdrop-filter:none}
+.modal-bg{background:rgba(0,0,1,.72)}
+.tbl-wrap{background:var(--raised);border:1px solid var(--edge);border-radius:8px}
+
+/* nút */
+.btn:hover{border-color:var(--teal)}
+.btn.solid{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.solid:hover{background:var(--brand-hi);border-color:var(--brand-hi)}
+.btn.teal{color:var(--on-teal)}
+.btn.sell{border-color:var(--teal);color:var(--teal-tx)}
+.btn.danger{border-color:var(--danger)}
+.btn.star{color:var(--amber-tx)}
+
+/* tab đang chọn: tím thương hiệu, gạch chân cyan */
+.seg button.on,.subtabs button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.tool-tabs button.on::after{background:var(--teal);box-shadow:0 0 10px rgba(74,220,230,.7)}
+.bt.on{background:var(--hover)}
+
+/* thanh chọn nhiều dòng */
+.selbar{background:rgba(14,6,20,.9);border-color:var(--edge)}
+.selbar.on{background:var(--brand);border-color:var(--teal);color:#fff}
+.selbar.on .btn:hover{border-color:#fff;background:rgba(255,255,255,.18)}
+
+/* bảng: dòng Special ám vàng rất nhẹ, tách nhóm bằng đường cyan mờ */
+tr.tray td{border-top-color:rgba(0,0,1,.55)}
+tr.r:hover td{background:var(--hover)}
+tr.bh td{border-bottom-color:var(--teal)}
+.tbl th{color:var(--mute)}
+
+/* tô sáng từ khóa: nền tím, chữ trắng vẫn đọc rõ */
+.hl-back mark{background:rgba(178,63,183,.85);color:transparent}
+
+/* tooltip, toast */
+#toast{background:#fff;color:#000001;box-shadow:0 8px 28px rgba(0,0,1,.6)}
+
+/* focus nhìn thấy trên nền tối */
+:focus-visible{outline-color:var(--teal)}
+::selection{background:var(--brand);color:#fff}
+* {scrollbar-color:rgba(190,150,225,.5) transparent}
+
+@media (max-width:720px){
+  body{background-position:60% center}
+}
+@media (prefers-reduced-transparency:reduce){
+  .pane,.toolbar,.sec,.trayx,.tbl-wrap,.empty,.topbar{backdrop-filter:none;background:#0B0610}
+}

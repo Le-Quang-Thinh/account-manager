@@ -1,0 +1,46 @@
+/* ===== nút ===== */
+.btn{font-size:13.5px;font-weight:500;line-height:1.2;color:var(--ink);background:var(--raised);border:1px solid var(--line);border-radius:6px;padding:7px 12px;cursor:pointer}
+.btn:hover{border-color:var(--ink)}
+.btn.solid{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.btn.teal{background:var(--teal);border-color:var(--teal);color:var(--on-teal);font-weight:600}
+.btn.teal:hover{background:var(--teal-hover);border-color:var(--teal-hover)}
+.btn.star{background:var(--amber-bg);border-color:var(--amber);color:var(--amber-tx)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--mute)}
+.btn.ghost:hover{color:var(--ink);border-color:var(--line)}
+.btn.sm{padding:3px 9px;font-size:12.5px}
+.btn.danger{color:var(--danger)}
+.btn.sell{border-color:var(--teal);color:var(--teal-tx)}
+
+/* ===== đầu trang ===== */
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:0 0 10px}
+h1{margin:0;font-size:32px;line-height:1;font-weight:700;font-stretch:76%;letter-spacing:-.01em}
+.sub{margin:8px 0 0;color:var(--mute);font-size:13.5px}
+.sub b{color:var(--ink);font-weight:600}
+.head-c{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.search{width:240px;border:1px solid var(--line);background:var(--raised);border-radius:6px;padding:7px 10px;font-size:13.5px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--raised)}
+.seg button{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:var(--mute);padding:7px 11px;font-size:13px;font-weight:500;cursor:pointer}
+.seg button:hover{color:var(--ink)}
+.seg button.on{background:var(--ink);color:var(--bg)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.dot.farm{background:var(--teal)}.dot.special{background:var(--amber)}.dot.sold{background:var(--slate)}
+.menu-wrap{position:relative}
+.menu{position:absolute;right:0;top:calc(100% + 6px);min-width:250px;background:var(--raised);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 28px rgba(0,0,0,.18);padding:4px;z-index:9}
+.menu-i{display:block;width:100%;text-align:left;border:0;background:transparent;padding:8px 10px;border-radius:5px;font-size:13.5px;cursor:pointer}
+.menu-i:hover{background:var(--hover)}
+.hint{margin:0 0 12px;color:var(--mute);font-size:13.5px;max-width:84ch}
+
+
+/* ===== bổ sung chung ===== */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:34px}
+.btn.sm{min-height:28px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:disabled:hover{border-color:var(--line)}
+.btn.done{border-color:var(--teal);color:var(--teal-tx)}
+.icon{flex:none}
+.icon-btn{gap:6px}
+.sp{flex:1}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.fld{display:inline-flex;align-items:center;gap:8px;font-size:13.5px}
+.fld input[type=checkbox]{width:16px;height:16px;accent-color:var(--teal)}
+@media (pointer:coarse){.btn,.btn.sm{min-height:44px}.subtabs button{min-height:44px}}

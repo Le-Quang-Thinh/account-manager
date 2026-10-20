@@ -1,0 +1,55 @@
+/* ===== khung nhập/xuất văn bản dùng chung cho Lọc trùng, Chia và tách, Biến đổi ===== */
+.stack{display:flex;flex-direction:column;gap:12px;min-width:0}
+.grid{display:grid;gap:12px;align-items:start}
+.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid.split{grid-template-columns:minmax(0,45fr) minmax(0,55fr)}
+.pane{--tone:var(--slate);--tone-bg:var(--slate-bg);display:flex;flex-direction:column;min-width:0;background:var(--raised);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.pane.tone-teal{--tone:var(--teal-tx);--tone-bg:var(--teal-bg)}
+.pane.tone-amber{--tone:var(--amber-tx);--tone-bg:var(--amber-bg)}
+.pane.tone-red{--tone:var(--danger);--tone-bg:var(--hover)}
+.pane-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;background:var(--tone-bg);border-bottom:1px solid var(--line)}
+.pane-h h3{margin:0;font-size:15px;font-weight:700;font-stretch:88%;color:var(--tone)}
+.pane-h h3 small{font-weight:400;color:var(--mute);font-size:12px;font-stretch:100%}
+.pane-f{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--line)}
+.pane-f .inp{flex:1;min-width:0;padding:5px 9px;font-size:13px}
+.pane-empty{margin:0;padding:28px 12px;color:var(--mute);text-align:center}
+.badge{font-size:12px;font-weight:600;padding:1px 9px;border-radius:999px;background:var(--raised);color:var(--mute);border:1px solid var(--line)}
+.badge.tone-teal{color:var(--teal-tx)}.badge.tone-amber{color:var(--amber-tx)}.badge.tone-red{color:var(--danger)}
+.ta-pane{display:block;width:100%;min-height:240px;resize:vertical;border:0;outline:0;background:transparent;padding:10px 12px;font-family:var(--mono);font-size:13px;line-height:1.55;white-space:pre}
+.ta-pane:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.ta-pane.out{background:var(--hover)}
+.upload{cursor:pointer}
+.name-in{width:120px;padding:5px 9px;font-size:13px}
+.bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line)}
+.bar.col{flex-direction:column;align-items:stretch;gap:2px}
+.bar .row{margin:4px 0}
+.toolbar{background:var(--raised);border:1px solid var(--line);border-radius:8px}
+.grow{flex:1;min-width:180px}
+.note{margin:0;color:var(--mute);font-size:13.5px;max-width:90ch}
+.note code{font-family:var(--mono);font-size:12.5px;background:var(--raised);border:1px solid var(--line);padding:1px 5px;border-radius:4px;color:var(--ink)}
+.err{color:var(--danger);font-size:13px}
+.dim{color:var(--mute);font-size:12.5px}
+.mono{font-family:var(--mono);font-size:13px}
+.case-toggle{padding:6px 12px;border:1px solid var(--line);border-radius:6px;background:var(--raised);cursor:pointer}
+.file-list{list-style:none;margin:0;padding:0;max-height:520px;overflow:auto}
+.file-list li{display:flex;align-items:center;gap:12px;padding:6px 12px;border-bottom:1px solid var(--line)}
+.dup-chip{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:12px;font-weight:500;border:1px solid var(--danger);background:transparent;color:var(--danger);border-radius:999px;padding:1px 10px;cursor:pointer}
+.dup-chip u{margin-left:4px}
+.batches{display:flex;flex-direction:column;gap:8px;padding:10px;max-height:640px;overflow:auto;background:var(--surface)}
+.batch{background:var(--raised);border:1px solid var(--line);border-radius:6px;content-visibility:auto;contain-intrinsic-size:auto 78px}
+.batch-h{display:flex;align-items:center;gap:8px;padding:5px 8px;border-bottom:1px solid var(--line)}
+.batch-p{padding:6px 10px;font-family:var(--mono);font-size:12.5px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hl{position:relative;min-height:240px;display:flex}
+.hl-back,.hl-front{padding:10px 12px;font-family:var(--mono);font-size:13px;line-height:1.55;white-space:pre}
+.hl-back{position:absolute;inset:0;overflow:hidden;color:transparent;pointer-events:none}
+.hl-back mark{background:#F5D547;color:transparent;border-radius:2px}
+.hl-front{position:relative;flex:1;min-height:240px;resize:vertical;background:transparent}
+.modal-bg{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.5);display:grid;place-items:center;padding:16px}
+.modal{width:min(720px,100%);max-height:90vh;display:flex;flex-direction:column;background:var(--raised);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+@media (max-width:1100px){
+  .grid.three,.grid.split{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:760px){
+  .grid.two{grid-template-columns:minmax(0,1fr)}
+}
