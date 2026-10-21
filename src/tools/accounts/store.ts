@@ -59,6 +59,7 @@ async function pump() {
   dirty = false
   try {
     const r = await fetch(API, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(S) })
+    if (r.status === 401) { alert('Phiên đăng nhập đã hết hạn, trang sẽ tải lại để đăng nhập.'); location.reload(); return }
     if (!r.ok) throw new Error('HTTP ' + r.status)
     warned = false
   } catch (e) {

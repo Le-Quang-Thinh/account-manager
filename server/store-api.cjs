@@ -1,36 +1,47 @@
-// API lưu dữ liệu ra file JSON: GET đọc, PUT ghi. Dùng chung cho `vite` (dev) và `server.cjs` (production).
-// File nằm ở data/accounts.json (đổi thư mục bằng biến môi trường DATA_DIR).
-const fs = require('fs')
-const path = require('path')
+// Router /api/*: đăng nhập + lưu dữ liệu theo từng user vào SQLite. Dùng chung cho `vite` (dev) và `server.cjs` (production).
+//   POST /api/login   { username, password }
+//   POST /api/logout
+//   GET  /api/me      -> user hiện tại (401 nếu chưa đăng nhập)
+//   GET  /api/store   -> store của user đang đăng nhập (null nếu còn trống)
+//   PUT  /api/store   -> ghi đè store của user đang đăng nhập
+const { db, tx, FILE } = require('./db.cjs')
+const { currentUser, login, logout, sendJson } = require('./auth.cjs')
 
-const DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data')
-const FILE = path.join(DIR, 'accounts.json')
 const MAX_BYTES = 64 * 1024 * 1024
 
-function send(res, status, body) {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
-  res.end(body)
-}
+const insAccount = db.prepare(`INSERT INTO accounts (user_id, id, raw, user, batch, status, in_list, note, sale, sold_at, prev, added_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 
-// Ghi nguyên tử: ghi file tạm rồi đổi tên, giữ lại bản trước đó ở accounts.json.bak
-function writeFileSafe(text) {
-  fs.mkdirSync(DIR, { recursive: true })
-  const tmp = FILE + '.tmp'
-  fs.writeFileSync(tmp, text, 'utf8')
-  if (fs.existsSync(FILE)) fs.copyFileSync(FILE, FILE + '.bak')
-  fs.renameSync(tmp, FILE)
-}
-
-function storeApi(req, res) {
-  if (req.method === 'GET') {
-    try {
-      send(res, 200, fs.existsSync(FILE) ? fs.readFileSync(FILE, 'utf8') : 'null')
-    } catch (e) {
-      send(res, 500, JSON.stringify({ error: 'Không đọc được file dữ liệu: ' + e.message }))
+function writeStore(userId, j) {
+  tx(() => {
+    db.prepare('DELETE FROM accounts WHERE user_id = ?').run(userId)
+    for (const a of j.accounts) {
+      insAccount.run(userId, a.id, String(a.raw ?? ''), String(a.user ?? ''), a.batch | 0, String(a.status || 'farm'),
+        a.inList === false ? 0 : 1, String(a.note ?? ''), String(a.sale ?? ''), a.soldAt ?? null,
+        String(a.prev || 'special'), a.addedAt || 0)
     }
+    const { accounts, ...rest } = j
+    db.prepare('INSERT OR REPLACE INTO user_meta (user_id, value) VALUES (?, ?)').run(userId, JSON.stringify(rest))
+  })
+}
+
+function readStore(userId) {
+  const row = db.prepare('SELECT value FROM user_meta WHERE user_id = ?').get(userId)
+  if (!row) return null
+  const accounts = db.prepare('SELECT * FROM accounts WHERE user_id = ? ORDER BY id').all(userId).map(r => ({
+    id: r.id, raw: r.raw, user: r.user, batch: r.batch, status: r.status, inList: !!r.in_list,
+    note: r.note, sale: r.sale, soldAt: r.sold_at, prev: r.prev, addedAt: r.added_at,
+  }))
+  return { ...JSON.parse(row.value), accounts }
+}
+
+function store(req, res, user) {
+  if (req.method === 'GET') {
+    try { sendJson(res, 200, readStore(user.id)) } catch (e) { sendJson(res, 500, { error: 'Không đọc được dữ liệu: ' + e.message }) }
     return
   }
   if (req.method === 'PUT') {
+    if (!String(req.headers['content-type'] || '').startsWith('application/json')) return sendJson(res, 415, { error: 'Content-Type phải là application/json' })
     const chunks = []
     let size = 0
     let tooBig = false
@@ -40,15 +51,14 @@ function storeApi(req, res) {
       else chunks.push(c)
     })
     req.on('end', () => {
-      if (tooBig) return send(res, 413, JSON.stringify({ error: 'Dữ liệu quá lớn' }))
+      if (tooBig) return sendJson(res, 413, { error: 'Dữ liệu quá lớn' })
       try {
-        const text = Buffer.concat(chunks).toString('utf8')
-        const j = JSON.parse(text)
-        if (!j || !Array.isArray(j.accounts)) return send(res, 400, JSON.stringify({ error: 'Dữ liệu không hợp lệ' }))
-        writeFileSafe(text)
-        send(res, 200, JSON.stringify({ ok: true, accounts: j.accounts.length }))
+        const j = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+        if (!j || !Array.isArray(j.accounts)) return sendJson(res, 400, { error: 'Dữ liệu không hợp lệ' })
+        writeStore(user.id, j)
+        sendJson(res, 200, { ok: true, accounts: j.accounts.length })
       } catch (e) {
-        send(res, 400, JSON.stringify({ error: 'Không ghi được: ' + e.message }))
+        sendJson(res, 400, { error: 'Không ghi được: ' + e.message })
       }
     })
     return
@@ -57,4 +67,15 @@ function storeApi(req, res) {
   res.end()
 }
 
-module.exports = { storeApi, FILE }
+function api(req, res) {
+  const p = (req.originalUrl || req.url || '').split('?')[0].replace(/^\/api/, '')
+  if (p === '/login' && req.method === 'POST') return login(req, res)
+  if (p === '/logout' && req.method === 'POST') return logout(req, res)
+  const user = currentUser(req)
+  if (!user) return sendJson(res, 401, { error: 'Chưa đăng nhập' })
+  if (p === '/me' && req.method === 'GET') return sendJson(res, 200, user)
+  if (p === '/store') return store(req, res, user)
+  sendJson(res, 404, { error: 'Không tìm thấy' })
+}
+
+module.exports = { api, readStore, writeStore, FILE }

@@ -7,7 +7,8 @@
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
-    "preview": "node server.cjs"
+    "preview": "node server.cjs",
+    "user": "node server/users.cjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.0",

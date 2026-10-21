@@ -27,7 +27,7 @@ function Body({ id, toast }: { id: ToolId; toast: (m: string) => void }) {
   }
 }
 
-export default function App() {
+export default function App({ username, onLogout }: { username?: string; onLogout?: () => void }) {
   const [tool, setTool] = useState<ToolId>(() => readStored(TOOL_KEY, TOOL_IDS, 'accounts'))
   // nhóm đã mở: giữ nguyên (ẩn) để không mất dữ liệu khi chuyển tab, nhóm chưa mở thì chưa tải
   const [opened, setOpened] = useState<ToolId[]>(() => [tool])
@@ -64,6 +64,12 @@ export default function App() {
               <button key={t.id} type="button" role="tab" aria-selected={tool === t.id} className={tool === t.id ? 'on' : ''} onClick={() => pickTool(t.id)}>{t.label}</button>
             ))}
           </nav>
+          {onLogout && (
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flex: 'none' }}>
+              <span style={{ color: 'var(--mute)', fontSize: 14 }}>{username}</span>
+              <button type="button" className="btn" onClick={onLogout}>Đăng xuất</button>
+            </div>
+          )}
         </div>
       </header>
       <main className="main">
