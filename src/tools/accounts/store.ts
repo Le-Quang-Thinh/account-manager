@@ -2,48 +2,113 @@ import type { Account, BatchMeta, Settings, Status, Store } from './types'
 import type { ZipFile } from '../../shared/lib/zip'
 
 export const PAGE = 400 // số dòng hiện mỗi lần
-export const KEY = 'accmgr_simple_v1' // giữ nguyên key để không mất dữ liệu bản trước
+const LEGACY_KEY = 'accmgr_simple_v1' // nơi bản cũ lưu dữ liệu (localStorage), chỉ còn dùng để chuyển sang file
+const MIGRATED_KEY = 'accmgr_migrated_to_file'
+const API = './api/store'
 
 export function defSettings(): Settings { return { chunk: 100, group: 20, crlf: true, view: 'table' } }
 export function fresh(): Store { return { v: 3, settings: defSettings(), accounts: [], seq: 1, batchSeq: 0, batchMeta: {}, tags: [] } }
 
-export function load(): Store {
-  try {
-    // dữ liệu đọc từ localStorage chưa rõ kiểu, được chuẩn hoá bên dưới
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const j: any = JSON.parse(localStorage.getItem(KEY) || 'null')
-    if (j && Array.isArray(j.accounts)) {
-      const ver = j.v || 1
-      j.settings = Object.assign(defSettings(), j.settings || {})
-      if (ver < 3) { j.settings.group = 20; j.settings.chunk = 100 } // bản cũ: nhóm hiển thị 20, file zip mặc định 100
-      j.v = 3
-      j.seq = j.seq || (Math.max(0, ...j.accounts.map((a: Account) => a.id)) + 1)
-      j.batchMeta = j.batchMeta || {}
-      j.tags = Array.isArray(j.tags) ? j.tags.filter((x: unknown) => typeof x === 'string' && x.trim()).map((x: string) => x.trim()) : []
-      let legacy = false
-      for (const a of j.accounts as Account[]) {
-        if (!a.batch) { a.batch = 1; legacy = true } // dữ liệu bản cũ -> Batch 1
-        if (a.inList === undefined) a.inList = true // mặc định account nằm trong tab Danh sách
-      }
-      j.batchSeq = Math.max(j.batchSeq || 0, 0, ...j.accounts.map((a: Account) => a.batch))
-      if (legacy && !j.batchMeta[1]) j.batchMeta[1] = { at: Math.min(...j.accounts.map((a: Account) => a.addedAt || Date.now())), name: '' }
-      return j as Store
-    }
-  } catch (e) { /* dữ liệu hỏng: dùng bản mới */ }
-  return fresh()
+// Chuẩn hoá dữ liệu đọc từ file hoặc file sao lưu (có thể là bản cũ). Trả về null nếu không đúng dạng.
+export function normalize(raw: unknown): Store | null {
+  // dữ liệu bên ngoài chưa rõ kiểu, được chuẩn hoá bên dưới
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const j: any = raw
+  if (!j || !Array.isArray(j.accounts)) return null
+  const ver = j.v || 1
+  j.settings = Object.assign(defSettings(), j.settings || {})
+  if (ver < 3) { j.settings.group = 20; j.settings.chunk = 100 } // bản cũ: nhóm hiển thị 20, file zip mặc định 100
+  j.v = 3
+  j.seq = j.seq || (Math.max(0, ...j.accounts.map((a: Account) => a.id)) + 1)
+  j.batchMeta = j.batchMeta || {}
+  j.tags = Array.isArray(j.tags) ? j.tags.filter((x: unknown) => typeof x === 'string' && x.trim()).map((x: string) => x.trim()) : []
+  let legacy = false
+  for (const a of j.accounts as Account[]) {
+    if (!a.batch) { a.batch = 1; legacy = true } // dữ liệu bản cũ -> Batch 1
+    if (a.inList === undefined) a.inList = true // mặc định account nằm trong tab Danh sách
+  }
+  j.batchSeq = Math.max(j.batchSeq || 0, 0, ...j.accounts.map((a: Account) => a.batch))
+  if (legacy && !j.batchMeta[1]) j.batchMeta[1] = { at: Math.min(...j.accounts.map((a: Account) => a.addedAt || Date.now())), name: '' }
+  return j as Store
 }
 
-export const S: Store = load()
+// S là một object dùng chung, sửa trực tiếp rồi gọi save(). Được nạp từ file JSON bởi initStore() trước khi giao diện chạy.
+export const S: Store = fresh()
 export function replaceS(n: Store) {
   for (const k of Object.keys(S)) delete (S as unknown as Record<string, unknown>)[k]
   Object.assign(S, n)
 }
+
+// ----- lưu ra file JSON qua API (data/accounts.json) -----
+// Mỗi lần save() gửi bản mới nhất; nếu đang gửi dở thì gộp lại và gửi tiếp ngay khi xong.
+let storage: 'file' | 'local' = 'local'
+let inflight = false
+let dirty = false
+let warned = false
+export const isFileStorage = () => storage === 'file'
+
+function warnOnce(msg: string) {
+  if (warned) return
+  warned = true
+  alert(msg)
+}
+
+async function pump() {
+  if (inflight || !dirty) return
+  inflight = true
+  dirty = false
+  try {
+    const r = await fetch(API, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(S) })
+    if (!r.ok) throw new Error('HTTP ' + r.status)
+    warned = false
+  } catch (e) {
+    dirty = true // thử lại ở lần lưu kế tiếp
+    warnOnce('Không lưu được dữ liệu vào file trên máy chủ. Hãy kiểm tra server còn chạy không, và tải file sao lưu ngay!')
+  }
+  inflight = false
+  if (dirty && !warned) pump()
+}
+
 export function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(S)); return true } catch (e) {
-    alert('Không lưu được vào trình duyệt (đầy bộ nhớ?). Hãy tải file sao lưu ngay!')
-    return false
+  if (storage === 'local') {
+    // không có server (vd. mở bản build tĩnh): dùng tạm localStorage để không mất dữ liệu
+    try { localStorage.setItem(LEGACY_KEY, JSON.stringify(S)); return true } catch (e) {
+      warnOnce('Không lưu được vào trình duyệt (đầy bộ nhớ?). Hãy tải file sao lưu ngay!')
+      return false
+    }
+  }
+  dirty = true
+  pump()
+  return true
+}
+
+const readLegacy = () => {
+  try { return normalize(JSON.parse(localStorage.getItem(LEGACY_KEY) || 'null')) } catch (e) { return null }
+}
+
+// Nạp dữ liệu từ file JSON. Lần đầu, nếu file chưa có mà trình duyệt còn dữ liệu cũ thì chuyển sang file.
+export async function initStore() {
+  try {
+    const r = await fetch(API, { cache: 'no-store' })
+    if (!r.ok) throw new Error('HTTP ' + r.status)
+    const data = normalize(await r.json())
+    storage = 'file'
+    if (data) { replaceS(data); return }
+    const old = localStorage.getItem(MIGRATED_KEY) ? null : readLegacy()
+    if (old) {
+      replaceS(old)
+      dirty = true
+      await pump()
+      if (!dirty) localStorage.setItem(MIGRATED_KEY, '1') // đã ghi file xong, bản localStorage cũ giữ nguyên làm dự phòng
+    }
+  } catch (e) {
+    storage = 'local'
+    replaceS(readLegacy() ?? fresh())
   }
 }
+
+// Cảnh báo khi đóng tab lúc còn dữ liệu chưa ghi xong
+window.addEventListener('beforeunload', e => { if (inflight || dirty) e.preventDefault() })
 
 export function addTags(text: string) { // mỗi dòng (hoặc dấu phẩy) một tag; bỏ trùng không phân biệt hoa thường
   let n = 0

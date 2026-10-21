@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ChangeEvent, ReactNode } from 'react'
 import {
-  S, save, KEY, fresh, load, replaceS, importLines, bulkSpecial, addTags, removeTag,
+  S, save, fresh, normalize, replaceS, isFileStorage, importLines, bulkSpecial, addTags, removeTag,
   chunkByBatch, chunkByNote, rawText, toCSV, noteOrder,
 } from './store'
 import { stamp, download } from '../../shared/lib/browser'
@@ -62,11 +62,10 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
     const r = new FileReader()
     r.onload = () => {
       try {
-        const j = JSON.parse(String(r.result))
-        if (!j || !Array.isArray(j.accounts)) throw new Error('invalid')
+        const j = normalize(JSON.parse(String(r.result)))
+        if (!j) throw new Error('invalid')
         if (!confirm(`Khôi phục ${j.accounts.length} account? Dữ liệu hiện tại sẽ bị thay thế.`)) return
-        localStorage.setItem(KEY, JSON.stringify(j))
-        replaceS(load())
+        replaceS(j)
         onRestored()
         commit()
         toast('Đã khôi phục.')
@@ -151,7 +150,9 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
           <div className="row"><label className="fld"><input type="checkbox" checked={!!s.crlf} onChange={e => { S.settings.crlf = e.target.checked; commit() }} /> Xuống dòng kiểu Windows (CRLF) trong file .txt</label></div>
         </section>
         <section className="sec"><h2>Sao lưu và khôi phục</h2>
-          <p>Dữ liệu lưu trong trình duyệt trên máy này (theo từng địa chỉ web). Hãy tải file sao lưu thường xuyên và đừng xoá dữ liệu duyệt web của trang này.</p>
+          {isFileStorage()
+            ? <p>Dữ liệu được lưu tự động vào file <code>data/accounts.json</code> trên máy chạy server (bản trước đó nằm ở <code>accounts.json.bak</code>). Vẫn nên tải file sao lưu thỉnh thoảng.</p>
+            : <p>Không kết nối được server nên dữ liệu đang lưu tạm trong trình duyệt (theo từng địa chỉ web). Hãy chạy bằng <code>npm run dev</code> hoặc <code>npm run preview</code> để lưu ra file, và tải file sao lưu thường xuyên.</p>}
           <div className="row">
             <button className="btn solid" onClick={() => download(`sao-luu-${stamp()}.json`, JSON.stringify(S), 'application/json')}>Tải file sao lưu (.json)</button>
             <label className="btn" style={{ cursor: 'pointer' }}>Khôi phục từ file <input type="file" accept=".json" hidden onChange={restore} /></label>
