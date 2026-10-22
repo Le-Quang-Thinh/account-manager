@@ -3,14 +3,16 @@ import { readStored, writeStored } from './shared/lib/storage'
 
 // Mỗi nhóm công cụ tách thành một chunk riêng, chỉ tải khi mở lần đầu
 const AccountsTool = lazy(() => import('./tools/accounts/AccountsTool'))
+const GreenRaidTool = lazy(() => import('./tools/greenraid/GreenRaidTool'))
 const DedupeTool = lazy(() => import('./tools/dedupe/DedupeTool'))
 const SplitTool = lazy(() => import('./tools/split/SplitTool'))
 const TransformTool = lazy(() => import('./tools/transform/TransformTool'))
 
-type ToolId = 'accounts' | 'dedupe' | 'split' | 'transform'
+type ToolId = 'accounts' | 'greenraid' | 'dedupe' | 'split' | 'transform'
 
 const TOOLS: { id: ToolId; label: string }[] = [
   { id: 'accounts', label: 'Quản lý account' },
+  { id: 'greenraid', label: 'Quản lý 27 thẻ' },
   { id: 'dedupe', label: 'Lọc trùng' },
   { id: 'split', label: 'Chia và tách' },
   { id: 'transform', label: 'Biến đổi' },
@@ -21,6 +23,7 @@ const TOOL_KEY = 'accmgr_tool'
 function Body({ id, toast }: { id: ToolId; toast: (m: string) => void }) {
   switch (id) {
     case 'accounts': return <AccountsTool toast={toast} />
+    case 'greenraid': return <GreenRaidTool toast={toast} />
     case 'dedupe': return <DedupeTool />
     case 'split': return <SplitTool />
     case 'transform': return <TransformTool />

@@ -54,6 +54,24 @@ tr.tray td{padding:0;border-top:10px solid var(--bg);border-bottom:1px solid var
 .selacts .chip{background:transparent;color:inherit;border-color:currentColor}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
 .chip{display:inline-flex;align-items:center;gap:4px;font-size:13px;border:1px solid var(--amber);background:var(--amber-bg);color:var(--amber-tx);border-radius:999px;padding:3px 10px;cursor:pointer}
+.float-tags{position:fixed;right:20px;bottom:20px;z-index:40;width:320px;max-width:calc(100vw - 24px);background:#0B0610;color:#fff;border:2px solid var(--teal);border-radius:12px;box-shadow:0 0 0 1px #000,0 14px 40px rgba(0,0,0,.75),0 0 22px rgba(74,220,230,.28);overflow:hidden}
+.float-tags.min{width:auto}
+.ft-h{display:flex;align-items:center;gap:8px;padding:9px 8px 9px 14px;font-size:14px;font-weight:600;cursor:grab;touch-action:none;user-select:none;background:var(--brand);color:#fff}
+.ft-h b{display:inline-block;min-width:24px;text-align:center;padding:1px 7px;border-radius:999px;background:#fff;color:#2A0A2E;font-size:13px}
+.ft-h:active{cursor:grabbing}
+.ft-x{border:0;background:rgba(255,255,255,.16);color:#fff;cursor:pointer;font-size:17px;line-height:1;width:28px;height:28px;border-radius:6px}
+.ft-x:hover{background:rgba(255,255,255,.32)}
+.ft-b{display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px;max-height:50vh;overflow:auto;background:#0B0610}
+.float-tags .chip{font-size:14px;font-weight:600;padding:6px 14px;background:#1A1020;color:var(--amber);border:1.5px solid var(--amber)}
+.float-tags .chip:hover{background:var(--amber);color:#1C1400}
+.ft-b .chip kbd{font:inherit;font-size:11px;opacity:.8;border:1px solid currentColor;border-radius:4px;padding:0 5px;margin-right:2px}
+.ft-new{display:flex;gap:8px;padding:12px 14px;border-top:1px solid rgba(255,255,255,.18);background:#14091A}
+.ft-new input{flex:1;min-width:0;font-size:14px;background:#000;color:#fff;border:1.5px solid #8A7A92;border-radius:6px;padding:8px 10px}
+.ft-new input::placeholder{color:#B9A6BC}
+.ft-new input:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 2px rgba(74,220,230,.35)}
+.ft-new .btn{font-size:14px;font-weight:700;padding:8px 14px;white-space:nowrap;background:var(--teal);border-color:var(--teal);color:#000}
+.ft-new .btn:hover{background:#7FEAF1;border-color:#7FEAF1}
+.ft-new .btn:disabled{opacity:1;background:#2A2230;border-color:#2A2230;color:#9C8DA3;cursor:not-allowed}
 .chip.rm{cursor:default;padding-right:4px}
 .chip.rm button{border:0;background:transparent;color:inherit;cursor:pointer;font-size:15px;line-height:1;padding:0 4px}
 .chip.on{background:var(--amber);color:#1C1400}

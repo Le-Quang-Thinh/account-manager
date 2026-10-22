@@ -1,4 +1,6 @@
 // `npm start`: nếu chưa có dist/ thì tự build bằng Vite, rồi phục vụ site tĩnh.
+// nạp .env (nếu có) trước khi đọc biến môi trường
+try { process.loadEnvFile(require('path').join(__dirname, '.env')) } catch (e) { /* không có .env */ }
 const http = require('http'), fs = require('fs'), path = require('path'), { spawnSync } = require('child_process')
 const { api, FILE } = require('./server/store-api.cjs')
 const ROOT = path.join(__dirname, 'dist')
@@ -19,4 +21,8 @@ http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'application/octet-stream',
     'Cache-Control': f.includes('assets') ? 'public, max-age=31536000, immutable' : 'no-cache' })
   fs.createReadStream(f).pipe(res)
-}).listen(PORT, '0.0.0.0', () => { console.log('Quan ly account dang chay o cong ' + PORT); console.log('Du lieu SQLite tai: ' + FILE) })
+}).listen(PORT, '0.0.0.0', () => {
+  console.log('Quan ly account dang chay o cong ' + PORT); console.log('Du lieu SQLite tai: ' + FILE)
+  if (process.env.TELEGRAM_BOT_TOKEN) require('./server/telegram-bot.cjs').startBot(process.env.TELEGRAM_BOT_TOKEN)
+  else console.log('Chua co TELEGRAM_BOT_TOKEN trong .env nen bot Telegram khong chay')
+})

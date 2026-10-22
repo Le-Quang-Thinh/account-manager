@@ -3,12 +3,13 @@ import type { MouseEventHandler, ReactElement } from 'react'
 import {
   S, STL, fmtDate, noteGroups, noteOrder, inListAccounts, inListFarm,
   chunkByBatch, chunkByNote, rawText, toCSV, setSpecial, setFarm, setNote, sell, unsell,
-  confirmList, applyTag,
+  confirmList, applyTag, addTags,
   PAGE,
 } from './store'
 import { stamp, fmtShort, download, copyText } from '../../shared/lib/browser'
 import { makeZip } from '../../shared/lib/zip'
 import { Icon } from '../../shared/components/Icon'
+import FloatTags from './FloatTags'
 import type { Account, Ctx, Status, StatusFilter } from './types'
 
 const TITLES: Record<string, string> = { list: 'Danh sách', farm: 'Farm', special: 'Special', sold: 'Đã bán' }
@@ -215,6 +216,14 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
     tag: (t: string) => { const n = applyTag(selIds(), t); clear(); commit(); toast(`Đã gắn tag "${t}" cho ${n} account.`) },
   }
 
+  // Tạo ghi chú mới (nếu chưa có, không phân biệt hoa thường) rồi gắn luôn cho các account đã chọn
+  const createTag = (text: string) => {
+    const name = text.replace(/[\n,;]+/g, ' ').trim()
+    if (!name) return
+    addTags(name)
+    bulk.tag(S.tags.find(x => x.toLowerCase() === name.toLowerCase()) ?? name)
+  }
+
   // ----- vẽ -----
   const trayHead = (bl: TrayBlock) => {
     const items = bl.items.map(x => x.a)
@@ -354,6 +363,7 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
           {isList && <button className="btn teal" title="Loại Special và Đã bán khỏi Danh sách, chỉ giữ Farm, rồi tải .zip Farm" onClick={doConfirm}>Xác nhận và xuất Farm</button>}
         </div>
       </header>
+      <FloatTags tags={S.tags} count={sel.size} onTag={bulk.tag} onCreate={createTag} onClear={clear} />
       <p className="hint">{HINTS[tab]}</p>
       <div className={'selbar' + (sel.size ? ' on' : '')}>
         <label className="cb">
