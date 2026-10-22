@@ -7,21 +7,25 @@
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
-    "preview": "node server.cjs",
-    "user": "node server/users.cjs"
+    "user": "node server/users.cjs",
+    "bot": "node server/bot-cli.cjs",
+    "migrate": "node server/migrate-sqlite.cjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.0",
     "grammy": "^1.46.0",
+    "pg": "^8.23.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "vite": "^7.0.0"
   },
-  "main": "server.cjs",
   "devDependencies": {
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

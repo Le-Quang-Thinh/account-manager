@@ -5,7 +5,8 @@ import { createRequire } from 'node:module'
 
 const { api } = createRequire(import.meta.url)('./server/store-api.cjs')
 
-// Cùng một API (đăng nhập + lưu SQLite) cho cả `vite` (dev) và `vite preview`
+// Cùng một API (đăng nhập + lưu Supabase, cần DATABASE_URL trong .env) cho cả `vite` (dev) và `vite preview`.
+// Trên Vercel thì API chạy ở thư mục api/ với cùng router này.
 const storeFilePlugin = (): Plugin => ({
   name: 'store-file-api',
   configureServer(server) { server.middlewares.use('/api', api) },

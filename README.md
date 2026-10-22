@@ -8,18 +8,19 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-## Build và deploy
-```
-npm run build      # ra thư mục dist/
-```
-Trên host Node (bot keep, Pterodactyl...): upload source, host tự `npm install`, rồi `npm run build`, rồi `npm start` (phục vụ dist/ ở cổng SERVER_PORT hoặc PORT). Nếu quên build, `npm start` tự build.
+## Deploy lên Vercel + Supabase
+Frontend là site Vite (`dist/`), API nằm ở `api/` (Vercel Functions), dữ liệu ở Postgres của Supabase.
 
-`dist/` là site tĩnh, upload lên bất kỳ host nào:
-- **Vercel / Netlify / Cloudflare Pages**: Build command `npm run build`, Output directory `dist`.
-- **GitHub Pages / hosting thường**: upload nội dung thư mục `dist/` (đã có sẵn trong zip này).
+1. **Supabase**: tạo project, vào SQL Editor chạy toàn bộ `supabase/schema.sql`. Lấy chuỗi kết nối ở Project Settings -> Database -> Connection string -> **Transaction pooler** (cổng 6543).
+2. **Chạy local**: sao chép `.env.example` thành `.env`, điền `DATABASE_URL`, rồi `npm run dev`.
+3. **Chuyển dữ liệu SQLite cũ** (nếu có `data/app.db`): `npm run migrate`. Giữ nguyên user và mật khẩu; mọi người đăng nhập lại 1 lần. Chưa có user thì tạo bằng `npm run user -- add <user> --admin`.
+4. **Vercel**: import repo, framework Vite (đã có `vercel.json`). Đặt biến môi trường `DATABASE_URL`, và nếu dùng bot thì `TELEGRAM_BOT_TOKEN`, `TELEGRAM_LINK_SECRET`, `TELEGRAM_WEBHOOK_SECRET`. Nên chọn region Functions gần region của Supabase.
+5. **Bot Telegram** (webhook, không còn long polling): sau khi deploy, chạy 1 lần `npm run bot -- webhook https://<ten-mien>.vercel.app`. Muốn thử bot ở máy local thì `npm run bot -- poll` (tự gỡ webhook, nhớ đăng ký lại sau đó).
 
-## Lưu ý dữ liệu
-Dữ liệu lưu trong localStorage của trình duyệt, theo từng địa chỉ web (domain). Khác domain thì dữ liệu riêng.
+Giới hạn: body request của Vercel Functions tối đa ~4,5MB, nên dữ liệu một user vượt mức này thì không lưu được qua `PUT /api/store` và `/api/greenraid`.
+
+## Dữ liệu
+Dữ liệu lưu theo từng user trong Supabase, đăng nhập bằng user do admin tạo (`npm run user -- add|passwd|del|list` hoặc lệnh /adduser trong bot).
 Chuyển từ bản HTML cũ sang: ở bản cũ bấm "Tải file sao lưu (.json)", ở bản này vào Nhập / Xuất bấm "Khôi phục từ file".
 Nên tải file sao lưu thường xuyên.
 
