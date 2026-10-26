@@ -156,6 +156,51 @@ export function importLines(text: string, name?: string): { add: number; dup: nu
   for (const x of items) S.accounts.push({ id: S.seq++, raw: x.raw, user: x.user, batch: b, status: 'farm', inList: true, note: '', sale: '', soldAt: null, prev: 'special', addedAt: Date.now() })
   return { add: items.length, dup, batch: b }
 }
+// Số account Farm đang nằm trong Danh sách của từng batch (để biết batch nào bị lẻ)
+export function farmCount(b: number) { return S.accounts.filter(a => a.batch === b && a.inList !== false && a.status === 'farm').length }
+// Thêm account vào batch có sẵn (b = 0 hoặc batch không tồn tại thì tạo batch mới). Trùng tên ở mọi batch thì bỏ qua.
+// Dòng trùng với account Farm đang ở batch khác thì chuyển account đó sang batch này (không tạo bản sao).
+export function addToBatch(text: string, b: number): { add: number; moved: number; dup: number; batch: number | null } {
+  if (!b || !S.batchMeta[b]) return { ...importLines(text), moved: 0 }
+  const byUser = new Map(S.accounts.map(a => [a.user.toLowerCase(), a]))
+  const seen = new Set(byUser.keys())
+  let add = 0, dup = 0, moved = 0
+  for (let line of text.split(/\r?\n/)) {
+    line = line.trim()
+    if (!line) continue
+    const u = parseUser(line), k = u.toLowerCase()
+    if (seen.has(k)) {
+      const ex = byUser.get(k)
+      if (ex && ex.batch !== b && ex.status === 'farm' && ex.inList !== false) { ex.batch = b; byUser.delete(k); moved++ } else dup++
+      continue
+    }
+    seen.add(k)
+    S.accounts.push({ id: S.seq++, raw: line, user: u, batch: b, status: 'farm', inList: true, note: '', sale: '', soldAt: null, prev: 'special', addedAt: Date.now() })
+    add++
+  }
+  return { add, moved, dup, batch: add || moved ? b : null }
+}
+// Sửa nội dung một dòng account. Trả về lỗi (chuỗi) nếu rỗng hoặc tên tài khoản trùng account khác.
+export function editRaw(id: number, text: string): string | null {
+  const a = S.accounts.find(x => x.id === id)
+  const raw = text.trim()
+  if (!a) return 'Không tìm thấy account.'
+  if (!raw) return 'Nội dung không được để trống.'
+  const u = parseUser(raw)
+  if (S.accounts.some(x => x.id !== id && x.user.toLowerCase() === u.toLowerCase())) return `Tài khoản "${u}" đã tồn tại.`
+  a.raw = raw; a.user = u
+  return null
+}
+// Chuyển account sang batch khác (b = 0 tạo batch mới)
+export function moveBatch(ids: number[], b: number) {
+  const set = new Set(ids)
+  const list = S.accounts.filter(a => set.has(a.id))
+  if (!list.length) return { n: 0, batch: null as number | null }
+  if (!b || !S.batchMeta[b]) { b = ++S.batchSeq; S.batchMeta[b] = { at: Date.now(), name: '' } }
+  let n = 0
+  for (const a of list) if (a.batch !== b) { a.batch = b; n++ }
+  return { n, batch: b }
+}
 export function setSpecial(ids: number[], note?: string | null) {
   const set = new Set(ids)
   let n = 0

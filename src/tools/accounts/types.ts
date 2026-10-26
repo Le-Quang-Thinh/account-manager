@@ -49,9 +49,13 @@ export interface Ctx {
   setFb: (b: BatchFilter) => void
   fs: StatusFilter
   setFs: (s: StatusFilter) => void
+  fn: Set<string>
+  setFn: (s: Set<string>) => void
   visible: Account[]
   ordered: Account[]
   isNoteTab: boolean
+  farmLock: Set<number> | null
+  setFarmLock: (s: Set<number> | null) => void
   commit: () => void
   toast: (m: string) => void
 }

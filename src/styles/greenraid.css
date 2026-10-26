@@ -82,3 +82,5 @@
 .ev-block-h .dim{font-size:10px;font-weight:500}
 .ev-all{display:flex;align-items:center;gap:6px;font-weight:800;cursor:pointer}
 .ev-none{padding:10px}
+
+.ev-clean{display:flex;flex-wrap:wrap;gap:6px;padding-top:0}

@@ -80,6 +80,9 @@ export function batchStats(b: EvBatch) {
 // Hoàn thành: có account và tất cả đều Success (tick, không lỗi). Account đã xuất vốn là Success nên vẫn tính.
 export const isComplete = (b: EvBatch) => b.accounts.length > 0 && b.accounts.every(isSuccess)
 
+// Batch đã xuất hết: có account và không còn account nào chưa xuất
+export const isDrained = (b: EvBatch) => b.accounts.length > 0 && b.accounts.every(a => a.exported)
+
 export function matchesStatus(a: EvAccount, f: StatusFilter) {
   if (f === 'all') return true
   if (f === 'todo') return !a.checked
@@ -92,6 +95,7 @@ export type Action =
   | { type: 'import'; batches: EvBatch[] }
   | { type: 'rename'; id: string; name: string }
   | { type: 'delete'; id: string }
+  | { type: 'deleteMany'; ids: string[] }
   | { type: 'tick'; batchId: string; ids: string[]; checked: boolean }
   | { type: 'tickAll'; batchId: string; checked: boolean }
   | { type: 'fail'; batchId: string; id: string; label: '' | FailLabel }
@@ -126,6 +130,12 @@ export function reducer(s: EvState, a: Action): EvState {
     case 'delete': {
       const batches = s.batches.filter(b => b.id !== a.id)
       const selectedId = s.selectedId === a.id ? (batches[0]?.id ?? '') : s.selectedId
+      return fixTab({ ...s, batches, selectedId })
+    }
+    case 'deleteMany': {
+      const gone = new Set(a.ids)
+      const batches = s.batches.filter(b => !gone.has(b.id))
+      const selectedId = gone.has(s.selectedId) ? (batches[0]?.id ?? '') : s.selectedId
       return fixTab({ ...s, batches, selectedId })
     }
     case 'tick': {

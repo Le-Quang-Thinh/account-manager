@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useReducer, useState } from 'react'
-import { S, save, byStatus, inListAccounts, noteOrder, PAGE } from './store'
+import { useCallback, useDeferredValue, useMemo, useReducer, useState } from 'react'
+import { S, save, noteOrder, PAGE } from './store'
 import ListPage from './ListPage'
 import ImportExport from './ImportExport'
 import BatchSidebar from './BatchSidebar'
@@ -15,19 +15,30 @@ export default function AccountsTool({ toast }: { toast: (m: string) => void }) 
   const [q, setQ] = useState('')
   const [fb, setFb] = useState<BatchFilter>('all') // lọc batch
   const [fs, setFs] = useState<StatusFilter>('all') // lọc trạng thái (tab Danh sách)
+  const [fn, setFn] = useState<Set<string>>(() => new Set()) // lọc ghi chú (tab Special / Đã bán), rỗng = tất cả
 
   // dữ liệu nằm trong S (store.ts, thay đổi trực tiếp); commit = lưu + vẽ lại
   const commit = useCallback(() => { save(); bump() }, [])
 
+  // khóa trạng thái (tab Farm, luôn bật): account Farm lúc vào tab vẫn nằm lại khi đổi sang Special, cho tới khi xác nhận
+  const snapFarm = () => new Set(S.accounts.filter(a => a.status === 'farm').map(a => a.id))
+  const [farmLock, setFarmLock] = useState<Set<number> | null>(snapFarm)
+
   const inScope = (a: Account) => tab === 'list'
     ? (a.inList !== false && (fs === 'all' || a.status === fs))
-    : a.status === tab
+    : tab === 'farm'
+      ? (a.status === 'farm' || (a.status === 'special' && !!farmLock?.has(a.id)))
+      : a.status === tab
 
   const isNoteTab = tab === 'special' || tab === 'sold'
-  const s = q.trim().toLowerCase()
+  const dq = useDeferredValue(q) // gõ tìm kiếm không làm khựng ô nhập khi danh sách dài
+  const s = dq.trim().toLowerCase()
+  // sắp theo batch (ổn định) để account thêm/chuyển vào batch cũ vẫn nằm đúng nhóm
   const visible = S.accounts.filter(a =>
     inScope(a) && (fb === 'all' || a.batch === fb) &&
+    (!isNoteTab || fn.size === 0 || fn.has((a.note || '').trim())) &&
     (!s || a.raw.toLowerCase().includes(s) || (a.note || '').toLowerCase().includes(s)))
+    .sort((x, y) => x.batch - y.batch)
   const ordered = isNoteTab ? noteOrder(visible) : visible
 
   // lựa chọn luôn là tập con của danh sách đang hiện
@@ -38,22 +49,23 @@ export default function AccountsTool({ toast }: { toast: (m: string) => void }) 
     sel.forEach(id => { if (visIds.has(id)) n.add(id); else changed = true })
     return changed ? n : sel
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sel, tab, q, fb, fs, S.accounts.length, visible.length])
+  }, [sel, tab, q, fb, fs, fn, S.accounts.length, visible.length])
 
-  const goTab = (t: Tab) => { setTab(t); setLimit(PAGE); setSel(new Set()); setQ(''); window.scrollTo(0, 0) }
+  const goTab = (t: Tab) => { if (t === 'farm' && tab !== 'farm') setFarmLock(snapFarm()); setTab(t); setLimit(PAGE); setSel(new Set()); setQ(''); setFn(new Set()); window.scrollTo(0, 0) }
 
-  const counts = {
-    list: inListAccounts().length,
-    farm: byStatus('farm').length,
-    special: byStatus('special').length,
-    sold: byStatus('sold').length,
+  const counts = { list: 0, farm: 0, special: 0, sold: 0 }
+  const perBatch = new Map<number, number>() // số account từng batch trong phạm vi tab hiện tại (một lượt duyệt)
+  let scopeCount = 0
+  for (const a of S.accounts) {
+    if (a.inList !== false) counts.list++
+    counts[a.status]++
+    if (inScope(a)) { scopeCount++; perBatch.set(a.batch, (perBatch.get(a.batch) || 0) + 1) }
   }
-  const batchCount = (b: number) => S.accounts.filter(a => a.batch === b && inScope(a)).length
-  const scopeCount = S.accounts.filter(inScope).length
+  const batchCount = (b: number) => perBatch.get(b) || 0
 
   const ctx: Ctx = {
-    tab, goTab, sel: effSel, setSel, limit, setLimit, q, setQ, fb, setFb, fs, setFs,
-    visible, ordered, isNoteTab, commit, toast,
+    tab, goTab, sel: effSel, setSel, limit, setLimit, q, setQ, fb, setFb, fs, setFs, fn, setFn,
+    visible, ordered, isNoteTab, farmLock, setFarmLock, commit, toast,
   }
 
   const items: SubTabItem<Tab>[] = [

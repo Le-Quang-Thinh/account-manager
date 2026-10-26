@@ -3,6 +3,7 @@ import type { MouseEventHandler, ReactElement } from 'react'
 import {
   S, STL, fmtDate, noteGroups, noteOrder, inListAccounts, inListFarm,
   chunkByBatch, chunkByNote, rawText, toCSV, setSpecial, setFarm, setNote, sell, unsell,
+  editRaw, moveBatch, batchIds, farmCount,
   confirmList, applyTag, addTags,
   PAGE,
 } from './store'
@@ -10,6 +11,7 @@ import { stamp, fmtShort, download, copyText } from '../../shared/lib/browser'
 import { makeZip } from '../../shared/lib/zip'
 import { Icon } from '../../shared/components/Icon'
 import FloatTags from './FloatTags'
+import AddPanel from './AddPanel'
 import type { Account, Ctx, Status, StatusFilter } from './types'
 
 const TITLES: Record<string, string> = { list: 'Danh sách', farm: 'Farm', special: 'Special', sold: 'Đã bán' }
@@ -68,10 +70,14 @@ type TrayBlock = NoteBlock | GroupBlock
 type Block = TrayBlock | HeadBlock
 
 export default function ListPage({ ctx }: { ctx: Ctx }) {
-  const { tab, goTab, sel, setSel, limit, setLimit, q, setQ, fb, setFb, fs, setFs, visible, ordered, isNoteTab, commit, toast } = ctx
+  const { tab, goTab, sel, setSel, limit, setLimit, q, setQ, fb, setFb, fs, setFs, fn, setFn, visible, ordered, isNoteTab, farmLock, setFarmLock, commit, toast } = ctx
   const isList = tab === 'list', isSold = tab === 'sold'
+  const locked = tab === 'farm' && !!farmLock
+  const showSt = isList || locked
   const view = S.settings.view === 'text' ? 'text' : 'table'
   const [menu, setMenu] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const canAdd = tab === 'farm' || isList
   const lastSel = useRef<number | null>(null)
   const shift = useRef(false)
 
@@ -149,11 +155,18 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
     commit()
     toast(`Đã chuyển ${n} account sang Đã bán.`)
   }
+  const pendingSp = locked ? S.accounts.filter(a => farmLock?.has(a.id) && a.status === 'special').length : 0
+  const confirmLock = () => {
+    const n = pendingSp
+    setFarmLock(new Set(S.accounts.filter(a => a.status === 'farm').map(a => a.id)))
+    clear()
+    toast(`Đã xác nhận: tách ${n} account Special ra khỏi Farm.`)
+  }
   const pickNote = (a: Account, value: string) => {
     if (value) applyTag([a.id], value)
     else if (a.status !== 'farm') setNote([a.id], '')
     else return
-    toggle([a.id], false)
+    if (!locked) toggle([a.id], false)
     commit()
   }
   const doConfirm = () => {
@@ -171,6 +184,7 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
   const scope = (kind: string) => S.accounts.filter(a => {
     if (kind === 'list') { if (a.inList === false) return false; if (fs !== 'all' && a.status !== fs) return false }
     else if (a.status !== kind) return false
+    if (fn.size && (kind === 'special' || kind === 'sold') && !fn.has((a.note || '').trim())) return false
     return fb === 'all' || a.batch === fb
   })
   const exportAct = (act: string) => {
@@ -190,6 +204,15 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
       csvList: () => { const l = scope('list'); if (!l.length) return empty(); download(`danh-sach-${stamp()}.csv`, toCSV(l), 'text/csv;charset=utf-8') },
     }
     map[act]()
+  }
+  // các ghi chú đang có trong tab (theo batch đang lọc), kèm số account
+  const noteChips = isNoteTab
+    ? noteGroups(S.accounts.filter(a => a.status === tab && (fb === 'all' || a.batch === fb))).map(g => ({ note: g.note, n: g.items.length }))
+    : []
+  const toggleNote = (note: string) => {
+    const n = new Set(fn)
+    if (n.has(note)) n.delete(note); else n.add(note)
+    setFn(n); setLimit(PAGE)
   }
   const exportItems = (): [string, string][] => {
     const z = `${S.settings.chunk} dòng mỗi file`
@@ -251,8 +274,27 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
     )
   }
 
-  const rowActs = (a: Account) => {
+  const doEdit = (a: Account) => {
+    const v = prompt('Sửa nội dung account (cả dòng, gồm mật khẩu):', a.raw)
+    if (v === null || v.trim() === a.raw) return
+    const err = editRaw(a.id, v)
+    if (err) { toast(err); return }
+    commit()
+    toast('Đã sửa account.')
+  }
+  const doMove = (v: string) => {
+    if (v === '') return
+    const r = moveBatch(selIds(), +v)
+    clear(); commit()
+    toast(r.n ? `Đã chuyển ${r.n} account sang Batch ${r.batch}.` : 'Các account đã nằm sẵn trong batch này.')
+  }
+  const rowActs = (a: Account) => <>
+    <button className="btn sm ghost" title="Sửa nội dung account" onClick={() => doEdit(a)}>Sửa</button>
+    {rowStatusActs(a)}
+  </>
+  const rowStatusActs = (a: Account) => {
     if (a.status === 'farm') return <button className="btn sm star" title="Chuyển sang Special" onClick={() => { setSpecial([a.id], ''); toggle([a.id], false); commit() }}><Icon name="star" size={13} />Special</button>
+    if (a.status === 'special' && locked) return <button className="btn sm ghost" onClick={() => { setFarm([a.id]); toggle([a.id], false); commit() }}>Về Farm</button>
     if (a.status === 'special') return <>
       <button className="btn sm ghost" onClick={() => { setFarm([a.id]); toggle([a.id], false); commit() }}>Về Farm</button>
       <button className="btn sm sell" onClick={() => doSell([a.id])}>Bán</button>
@@ -260,7 +302,7 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
     return <button className="btn sm ghost" onClick={() => { if (unsell(a.id)) { toggle([a.id], false); commit(); toast('Đã hoàn tác, account về lại Special.') } }}>Hoàn tác bán</button>
   }
 
-  const cols = 5 + (isNoteTab ? 1 : 0) + (isList ? 1 : 0) + (isSold ? 2 : 0)
+  const cols = 5 + (isNoteTab ? 1 : 0) + (showSt ? 1 : 0) + (isSold ? 2 : 0)
   let shown = 0
   const bodyEls: ReactElement[] = []
   for (const bl of blocks) {
@@ -301,7 +343,7 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
             <td className="c-n">{pos}</td>
             {isNoteTab && <td className="c-batch">Batch {a.batch}</td>}
             <td><RawCell raw={a.raw} /></td>
-            {isList && <td className="c-st"><span className="st"><span className={'dot ' + a.status} />{STL[a.status]}</span></td>}
+            {showSt && <td className="c-st"><span className="st"><span className={'dot ' + a.status} />{STL[a.status]}</span></td>}
             <td className="c-note"><NoteSelect a={a} onPick={pickNote} /></td>
             {isSold && <><td>{a.sale}</td><td className="c-date">{fmtDate(a.soldAt)}</td></>}
             <td className="c-act">{rowActs(a)}</td>
@@ -324,7 +366,7 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
     const sellB = <button className="btn" onClick={bulk.sell}>Bán</button>
     const un = <button className="btn" onClick={bulk.unsell}>Hoàn tác bán</button>
     const del = <button className="btn" onClick={bulk.del}>Xoá</button>
-    if (tab === 'farm') return <>{star}{del}</>
+    if (tab === 'farm') return <>{star}{locked && farm}{del}</>
     if (tab === 'special') return <>{farm}{sellB}{del}</>
     if (tab === 'sold') return <>{un}{del}</>
     return <>{star}{farm}{sellB}{del}</>
@@ -360,11 +402,27 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
               {exportItems().map(([a, l]) => <button key={a} className="menu-i" role="menuitem" onClick={() => exportAct(a)}>{l}</button>)}
             </div>
           </div>
+          {canAdd && <button className="btn" aria-expanded={adding} title="Thêm account vào batch (bù batch bị lẻ)" onClick={() => setAdding(v => !v)}>Thêm account</button>}
           {isList && <button className="btn teal" title="Loại Special và Đã bán khỏi Danh sách, chỉ giữ Farm, rồi tải .zip Farm" onClick={doConfirm}>Xác nhận và xuất Farm</button>}
         </div>
       </header>
+      {canAdd && adding && (
+        <AddPanel fb={fb} onClose={() => setAdding(false)}
+          onDone={(b, msg) => { toast(msg); if (b) { commit(); setAdding(false) } }} />
+      )}
       <FloatTags tags={S.tags} count={sel.size} onTag={bulk.tag} onCreate={createTag} onClear={clear} />
-      <p className="hint">{HINTS[tab]}</p>
+      {isNoteTab && noteChips.length > 0 && (
+        <div className="notefilter" role="group" aria-label="Lọc theo ghi chú">
+          <span className="hint-inline">Lọc ghi chú (cũng áp dụng khi xuất file):</span>
+          <button className={'chip' + (fn.size === 0 ? ' on' : '')} aria-pressed={fn.size === 0} onClick={() => setFn(new Set())}>Tất cả</button>
+          {noteChips.map(c => (
+            <button key={c.note} className={'chip' + (fn.has(c.note) ? ' on' : '')} aria-pressed={fn.has(c.note)} onClick={() => toggleNote(c.note)}>
+              {c.note || 'Không ghi chú'} ({c.n})
+            </button>
+          ))}
+        </div>
+      )}
+      <p className="hint">{locked ? 'Đang khóa trạng thái: account đánh dấu Special vẫn ở lại Farm. Bấm “Xác nhận đã đánh dấu xong” để tách Special ra.' : HINTS[tab]}</p>
       <div className={'selbar' + (sel.size ? ' on' : '')}>
         <label className="cb">
           <Check id="selAll" checked={allSel} indeterminate={selN > 0 && !allSel} disabled={!ordered.length} label="Chọn tất cả"
@@ -375,6 +433,11 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
           <div className="selacts">
             {S.tags.map(t => <button key={t} className="chip" title="Gắn tag cho các account đã chọn" onClick={() => bulk.tag(t)}>{t}</button>)}
             {acts()}
+            <select className="mv-sel" value="" aria-label="Chuyển sang batch khác" onChange={e => doMove(e.target.value)}>
+              <option value="">Chuyển batch…</option>
+              {batchIds().map(b => <option key={b} value={b}>{uiBatch(b)} ({farmCount(b)} Farm)</option>)}
+              <option value={0}>Batch mới</option>
+            </select>
             <button className="btn" onClick={clear}>Bỏ chọn</button>
           </div>
         )}
@@ -384,10 +447,10 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
           <>
             {view === 'text' ? bodyEls : (
               <div className="tbl-wrap">
-                <table className={'tbl ' + (isList ? 'showst' : '')}>
+                <table className={'tbl ' + (showSt ? 'showst' : '')}>
                   <thead><tr>
                     <th></th><th className="c-n">#</th>{isNoteTab && <th>Batch</th>}<th>Account và mật khẩu</th>
-                    {isList && <th>Trạng thái</th>}<th>Ghi chú</th>{isSold && <><th>Thông tin bán</th><th>Ngày bán</th></>}<th></th>
+                    {showSt && <th>Trạng thái</th>}<th>Ghi chú</th>{isSold && <><th>Thông tin bán</th><th>Ngày bán</th></>}<th></th>
                   </tr></thead>
                   <tbody>{bodyEls}</tbody>
                 </table>
@@ -399,6 +462,12 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
           </>
         )}
       </div>
+      {locked && (
+        <div className="lockbar">
+          <span>{pendingSp ? <><b>{pendingSp}</b> account đã đánh dấu Special đang được giữ lại trong Farm</> : 'Khóa trạng thái đang bật: account đánh dấu Special sẽ ở lại Farm'}</span>
+          <button className="btn teal" title="Tách các account đã đánh dấu Special ra khỏi Farm" onClick={confirmLock}>Xác nhận đã đánh dấu xong</button>
+        </div>
+      )}
     </>
   )
 }

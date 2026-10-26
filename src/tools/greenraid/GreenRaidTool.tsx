@@ -1,7 +1,7 @@
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import type { ChangeEvent, Dispatch } from 'react'
 import {
-  BLOCK_SIZE, EXPORT_LIMIT, FAIL_LABELS, batchStats, failName, isComplete, lineOf, loadState, makeBatch,
+  BLOCK_SIZE, EXPORT_LIMIT, FAIL_LABELS, batchStats, failName, isComplete, isDrained, lineOf, loadState, makeBatch,
   matchesStatus, outAccounts, planExport, reducer, saveState, summaryRows,
 } from './logic'
 import type { Action, EvAccount, EvBatch, EvState, ExportRecord, FailLabel, OutFilter, StatusFilter, SummaryFilter } from './logic'
@@ -93,9 +93,17 @@ function Sidebar({ s, dispatch, toast }: { s: EvState; dispatch: Dispatch<Action
   const remove = (b: EvBatch) => {
     if (window.confirm(`Xóa batch "${b.name}" (${b.accounts.length} account)? Không hoàn tác được.`)) dispatch({ type: 'delete', id: b.id })
   }
+  const removeMany = (list: EvBatch[], what: string) => {
+    const n = list.reduce((t, b) => t + b.accounts.length, 0)
+    if (!window.confirm(`Xóa ${list.length} batch ${what} (${n} account)? Không hoàn tác được.
+Mục "Xem" trong lịch sử Đã xuất sẽ không còn hiện nội dung của các account này (file đã tải về vẫn giữ nguyên).`)) return
+    dispatch({ type: 'deleteMany', ids: list.map(b => b.id) })
+    toast(`Đã xóa ${list.length} batch`)
+  }
   const done = s.batches.filter(isComplete)
   const active = s.batches.filter(b => !isComplete(b))
   const list = s.leftTab === 'active' ? active : done
+  const drained = done.filter(isDrained)
   return (
     <aside className="pane ev-col">
       <div className="pane-h"><h3>Event Batches</h3></div>
@@ -110,6 +118,14 @@ function Sidebar({ s, dispatch, toast }: { s: EvState; dispatch: Dispatch<Action
             onClick={() => dispatch({ type: 'ui', patch: { leftTab: 'done' } })}>Đã thành công <i>{done.length}</i></button>
         </div>
       </div>
+      {s.leftTab === 'done' && done.length > 0 && (
+        <div className="ev-pad ev-clean">
+          <button type="button" className="btn sm danger" disabled={!drained.length} onClick={() => removeMany(drained, 'đã xuất hết')}>
+            Dọn batch đã xuất hết ({drained.length})
+          </button>
+          <button type="button" className="btn sm ghost danger" onClick={() => removeMany(done, 'đã thành công')}>Xóa tất cả ({done.length})</button>
+        </div>
+      )}
       <div className="ev-list">
         {list.length === 0 && <p className="pane-empty">{s.batches.length ? 'Không có batch nào ở tab này.' : 'Chưa có batch. Hãy import file TXT.'}</p>}
         {list.map(b => {

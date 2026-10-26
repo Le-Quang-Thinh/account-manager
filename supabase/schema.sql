@@ -17,6 +17,7 @@ create table if not exists sessions (
   expires_at bigint not null
 );
 create index if not exists idx_sessions_user on sessions(user_id);
+create index if not exists idx_sessions_expires on sessions(expires_at); -- dọn phiên hết hạn
 
 -- Mỗi user một store riêng: id account chỉ duy nhất trong phạm vi user
 create table if not exists accounts (
@@ -36,6 +37,7 @@ create table if not exists accounts (
 );
 create index if not exists idx_accounts_user on accounts(user_id, lower(acc_user));
 create index if not exists idx_accounts_status on accounts(user_id, status);
+create index if not exists idx_accounts_batch on accounts(user_id, batch);
 
 -- settings, seq, batchSeq, batchMeta, tags... của từng user (JSON dạng text)
 create table if not exists user_meta (
