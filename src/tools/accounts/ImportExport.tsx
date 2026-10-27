@@ -151,8 +151,8 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
         </section>
         <section className="sec"><h2>Sao lưu và khôi phục</h2>
           {isFileStorage()
-            ? <p>Dữ liệu được lưu tự động vào file <code>data/accounts.json</code> trên máy chạy server (bản trước đó nằm ở <code>accounts.json.bak</code>). Vẫn nên tải file sao lưu thỉnh thoảng.</p>
-            : <p>Không kết nối được server nên dữ liệu đang lưu tạm trong trình duyệt (theo từng địa chỉ web). Hãy chạy bằng <code>npm run dev</code> hoặc <code>npm run preview</code> để lưu ra file, và tải file sao lưu thường xuyên.</p>}
+            ? <p>Dữ liệu được lưu tự động lên server (database) theo tài khoản đăng nhập. Vẫn nên tải file sao lưu thỉnh thoảng.</p>
+            : <p>Không kết nối được server nên dữ liệu đang lưu tạm trong trình duyệt (riêng cho từng tài khoản đăng nhập). Hãy chạy bằng <code>npm run dev</code> hoặc <code>npm run preview</code> để lưu, và tải file sao lưu thường xuyên.</p>}
           <div className="row">
             <button className="btn solid" onClick={() => download(`sao-luu-${stamp()}.json`, JSON.stringify(S), 'application/json')}>Tải file sao lưu (.json)</button>
             <label className="btn" style={{ cursor: 'pointer' }}>Khôi phục từ file <input type="file" accept=".json" hidden onChange={restore} /></label>

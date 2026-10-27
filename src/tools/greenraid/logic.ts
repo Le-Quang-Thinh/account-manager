@@ -158,9 +158,12 @@ export function reducer(s: EvState, a: Action): EvState {
   }
 }
 
-export function loadState(): EvState {
+// Bản lưu dự phòng trong trình duyệt: mỗi user một key riêng để không lẫn dữ liệu giữa các tài khoản
+const localKey = (userKey: string) => `${STORE_KEY}:${userKey}`
+
+export function loadState(userKey: string): EvState {
   try {
-    const raw = localStorage.getItem(STORE_KEY)
+    const raw = localStorage.getItem(localKey(userKey))
     if (!raw) return initialState
     const d = JSON.parse(raw)
     if (d?.version !== STORE_VERSION || !Array.isArray(d.batches)) return initialState
@@ -168,10 +171,10 @@ export function loadState(): EvState {
   } catch (e) { return initialState }
 }
 
-export function saveState(s: EvState): boolean {
+export function saveState(s: EvState, userKey: string): boolean {
   try {
     const { batches, history, ...rest } = s
-    localStorage.setItem(STORE_KEY, JSON.stringify({ version: STORE_VERSION, batches, history, state: rest }))
+    localStorage.setItem(localKey(userKey), JSON.stringify({ version: STORE_VERSION, batches, history, state: rest }))
     return true
   } catch (e) { return false }
 }

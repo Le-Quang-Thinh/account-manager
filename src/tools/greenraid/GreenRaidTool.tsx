@@ -349,8 +349,8 @@ function ExportPanel({ s, dispatch, toast }: { s: EvState; dispatch: Dispatch<Ac
   )
 }
 
-export default function GreenRaidTool({ toast }: { toast: (m: string) => void }) {
-  const [s, dispatch] = useReducer(reducer, undefined, loadState)
+export default function GreenRaidTool({ toast, userKey }: { toast: (m: string) => void; userKey: string }) {
+  const [s, dispatch] = useReducer(reducer, userKey, loadState)
   const [flashId, setFlashId] = useState('')
   const warned = useRef(false)
   const [ready, setReady] = useState(false)
@@ -370,21 +370,14 @@ export default function GreenRaidTool({ toast }: { toast: (m: string) => void })
       selectedId: r.batches.some(b => b.id === cur.selectedId) ? cur.selectedId : (r.batches[0]?.id ?? '') } })
   }, [])
 
-  // nạp từ server; lần đầu server còn trống mà trình duyệt có dữ liệu cũ thì đẩy lên
+  // nạp thẳng từ server (user mới chưa có dữ liệu thì bắt đầu trống); chỉ dùng bản trong trình duyệt khi không gọi được server
   const started = useRef(false)
   useEffect(() => {
     if (started.current) return
     started.current = true
-    pull().then(async r => {
+    pull().then(r => {
       online.current = true
-      if (r) adopt(r)
-      else {
-        const cur = sRef.current
-        if (cur.batches.length || cur.history.length) {
-          const p = await push(0, cur.batches, cur.history)
-          if (p.ok) { rev.current = p.rev; synced.current = { b: cur.batches, h: cur.history } }
-        } else synced.current = { b: cur.batches, h: cur.history }
-      }
+      adopt(r ?? { rev: 0, batches: [], history: [] })
       setSync('saved')
       setReady(true)
     }).catch(() => { setSync('local'); setReady(true) })
@@ -421,10 +414,10 @@ export default function GreenRaidTool({ toast }: { toast: (m: string) => void })
   useEffect(() => {
     if (!ready) return
     const t = window.setTimeout(() => {
-      if (!saveState(s) && !warned.current && !online.current) { warned.current = true; toast('Không lưu được dữ liệu vào trình duyệt (đầy bộ nhớ hoặc bị chặn)') }
+      if (!saveState(s, userKey) && !warned.current && !online.current) { warned.current = true; toast('Không lưu được dữ liệu vào trình duyệt (đầy bộ nhớ hoặc bị chặn)') }
     }, 400)
     return () => clearTimeout(t)
-  }, [s, toast, ready])
+  }, [s, toast, ready, userKey])
 
   useEffect(() => {
     if (!ready || !online.current) return
@@ -479,8 +472,9 @@ export default function GreenRaidTool({ toast }: { toast: (m: string) => void })
         <p className="sub">Tick account đã xử lý, gán nhãn lỗi, đánh dấu Special rồi xuất {EXPORT_LIMIT} account Success.
           {' '}<span className="dim">{{ saved: '· Đã lưu lên server', saving: '· Đang lưu…', error: '· Chưa lưu được lên server, sẽ thử lại khi có thay đổi', local: '· Chỉ lưu trên máy này' }[sync]}</span></p>
       </div>
-      {!ready ? <p className="pane-empty">Đang tải dữ liệu…</p> : (
-      <div className="ev-layout">
+      {!ready && <p className="loading" role="status">Đang đồng bộ với server…</p>}
+      {/* hiện ngay bản trong trình duyệt; khoá thao tác tới khi server trả về để không bị ghi đè */}
+      <div className="ev-layout" inert={!ready} aria-busy={!ready}>
         <Sidebar s={s} dispatch={dispatch} toast={toast} />
         <section className="pane ev-col ev-mid">
           <div className="ev-tabs top" role="tablist" aria-label="Màn hình">
@@ -497,7 +491,7 @@ export default function GreenRaidTool({ toast }: { toast: (m: string) => void })
           </div>
         </section>
         <ExportPanel s={s} dispatch={dispatch} toast={toast} />
-      </div>)}
+      </div>
     </div>
   )
 }

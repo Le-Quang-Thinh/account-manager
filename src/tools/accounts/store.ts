@@ -2,8 +2,6 @@ import type { Account, BatchMeta, Settings, Status, Store } from './types'
 import type { ZipFile } from '../../shared/lib/zip'
 
 export const PAGE = 400 // số dòng hiện mỗi lần
-const LEGACY_KEY = 'accmgr_simple_v1' // nơi bản cũ lưu dữ liệu (localStorage), chỉ còn dùng để chuyển sang file
-const MIGRATED_KEY = 'accmgr_migrated_to_file'
 const API = './api/store'
 
 export function defSettings(): Settings { return { chunk: 100, group: 20, crlf: true, view: 'table' } }
@@ -45,7 +43,7 @@ let storage: 'file' | 'local' = 'local'
 let inflight = false
 let dirty = false
 let warned = false
-export const isFileStorage = () => storage === 'file'
+export const isFileStorage = () => storage === 'file' || syncing
 
 function warnOnce(msg: string) {
   if (warned) return
@@ -70,42 +68,56 @@ async function pump() {
   if (dirty && !warned) pump()
 }
 
+// Dự phòng khi không có server: mỗi user một key localStorage riêng (theo id) nên không lẫn dữ liệu giữa các tài khoản
+let localKey = ''
+const keyFor = (userKey: string) => 'accmgr_store_v1:' + userKey
+const readLocal = () => {
+  try { return normalize(JSON.parse(localStorage.getItem(localKey) || 'null')) } catch (e) { return null }
+}
+
+// Luôn ghi bản sao vào localStorage (của đúng user) để lần mở sau hiện ngay
+const writeLocal = () => {
+  try { localStorage.setItem(localKey, JSON.stringify(S)); return true } catch (e) { return false }
+}
+
 export function save() {
+  const ok = writeLocal()
+  if (syncing) return ok // chưa đồng bộ xong với server: không đẩy bản localStorage (có thể cũ) lên đè DB
   if (storage === 'local') {
-    // không có server (vd. mở bản build tĩnh): dùng tạm localStorage để không mất dữ liệu
-    try { localStorage.setItem(LEGACY_KEY, JSON.stringify(S)); return true } catch (e) {
-      warnOnce('Không lưu được vào trình duyệt (đầy bộ nhớ?). Hãy tải file sao lưu ngay!')
-      return false
-    }
+    if (!ok) warnOnce('Không lưu được vào trình duyệt (đầy bộ nhớ?). Hãy tải file sao lưu ngay!')
+    return ok
   }
   dirty = true
   pump()
   return true
 }
 
-const readLegacy = () => {
-  try { return normalize(JSON.parse(localStorage.getItem(LEGACY_KEY) || 'null')) } catch (e) { return null }
-}
+// Giao diện đăng ký để biết khi nào đang đồng bộ / khi nào dữ liệu bị thay bằng bản từ server
+let syncing = false
+let dataVersion = 0
+const listeners = new Set<() => void>()
+export const subscribeStore = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l) } }
+export const isSyncing = () => syncing
+export const storeVersion = () => dataVersion
+const emit = () => listeners.forEach(l => l())
 
-// Nạp dữ liệu từ file JSON. Lần đầu, nếu file chưa có mà trình duyệt còn dữ liệu cũ thì chuyển sang file.
-export async function initStore() {
-  try {
-    const r = await fetch(API, { cache: 'no-store' })
-    if (!r.ok) throw new Error('HTTP ' + r.status)
-    const data = normalize(await r.json())
-    storage = 'file'
-    if (data) { replaceS(data); return }
-    const old = localStorage.getItem(MIGRATED_KEY) ? null : readLegacy()
-    if (old) {
-      replaceS(old)
-      dirty = true
-      await pump()
-      if (!dirty) localStorage.setItem(MIGRATED_KEY, '1') // đã ghi file xong, bản localStorage cũ giữ nguyên làm dự phòng
-    }
-  } catch (e) {
-    storage = 'local'
-    replaceS(readLegacy() ?? fresh())
-  }
+// Mở app: hiện ngay dữ liệu trong localStorage của user này (userKey = id user, hoặc 'offline'),
+// đồng thời gọi server (DB); xong thì thay bằng bản từ server (user mới chưa có dữ liệu thì store trống).
+export function initStore(userKey: string) {
+  localKey = keyFor(userKey)
+  replaceS(readLocal() ?? fresh())
+  syncing = true
+  fetch(API, { cache: 'no-store' })
+    .then(async r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status)
+      const data = normalize(await r.json()) ?? fresh()
+      storage = 'file'
+      replaceS(data)
+      writeLocal()
+      dataVersion++
+    })
+    .catch(() => { storage = 'local' }) // không gọi được server: giữ bản localStorage đang hiện
+    .finally(() => { syncing = false; emit() })
 }
 
 // Cảnh báo khi đóng tab lúc còn dữ liệu chưa ghi xong

@@ -1,5 +1,6 @@
-import { Activity, Suspense, lazy, useCallback, useRef, useState } from 'react'
+import { Activity, Suspense, lazy, useCallback, useRef, useState, useSyncExternalStore } from 'react'
 import { readStored, writeStored } from './shared/lib/storage'
+import { isSyncing, storeVersion, subscribeStore } from './tools/accounts/store'
 
 // Mỗi nhóm công cụ tách thành một chunk riêng, chỉ tải khi mở lần đầu
 const AccountsTool = lazy(() => import('./tools/accounts/AccountsTool'))
@@ -22,10 +23,10 @@ const TOOLS: { id: ToolId; label: string }[] = [
 const TOOL_IDS = TOOLS.map(t => t.id)
 const TOOL_KEY = 'accmgr_tool'
 
-function Body({ id, toast }: { id: ToolId; toast: (m: string) => void }) {
+function Body({ id, toast, userKey, dataVer }: { id: ToolId; toast: (m: string) => void; userKey: string; dataVer: number }) {
   switch (id) {
-    case 'accounts': return <AccountsTool toast={toast} />
-    case 'greenraid': return <GreenRaidTool toast={toast} />
+    case 'accounts': return <AccountsTool key={dataVer} toast={toast} />
+    case 'greenraid': return <GreenRaidTool toast={toast} userKey={userKey} />
     case 'events': return <EventsTool toast={toast} />
     case 'dedupe': return <DedupeTool />
     case 'split': return <SplitTool />
@@ -33,11 +34,13 @@ function Body({ id, toast }: { id: ToolId; toast: (m: string) => void }) {
   }
 }
 
-export default function App({ username, onLogout }: { username?: string; onLogout?: () => void }) {
+export default function App({ username, userKey, onLogout }: { username?: string; userKey: string; onLogout?: () => void }) {
   const [tool, setTool] = useState<ToolId>(() => readStored(TOOL_KEY, TOOL_IDS, 'accounts'))
   // nhóm đã mở: giữ nguyên (ẩn) để không mất dữ liệu khi chuyển tab, nhóm chưa mở thì chưa tải
   const [opened, setOpened] = useState<ToolId[]>(() => [tool])
   const [toastMsg, setToastMsg] = useState('')
+  const syncing = useSyncExternalStore(subscribeStore, isSyncing)
+  const dataVer = useSyncExternalStore(subscribeStore, storeVersion) // đổi khi dữ liệu bị thay bằng bản từ server -> dựng lại tool Accounts
   const toastTimer = useRef<number | undefined>(undefined)
 
   const toast = useCallback((m: string) => {
@@ -78,11 +81,12 @@ export default function App({ username, onLogout }: { username?: string; onLogou
           )}
         </div>
       </header>
-      <main className="main">
+      <main className="main" inert={syncing} aria-busy={syncing}>
+        {syncing && <p className="loading" role="status">Đang đồng bộ với server…</p>}
         {opened.map(id => (
           <Activity key={id} mode={tool === id ? 'visible' : 'hidden'}>
             <Suspense fallback={<p className="loading" role="status">Đang tải…</p>}>
-              <Body id={id} toast={toast} />
+              <Body id={id} toast={toast} userKey={userKey} dataVer={dataVer} />
             </Suspense>
           </Activity>
         ))}
