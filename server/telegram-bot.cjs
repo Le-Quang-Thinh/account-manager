@@ -6,6 +6,7 @@ const { secretOk, linkChat, isLinked, userOfChat, switchUser, unlinkChat } = req
 const { addGreenraidBatch } = require('./store-api.cjs')
 const { addUser, setPassword, delUser, listUsers, find } = require('./user-admin.cjs')
 const { lockedFor, noteFail, clearFails } = require('./throttle.cjs')
+const notion = require('./notion.cjs')
 
 const STATUS = { farm: 'Farm', special: 'Special', sold: 'Đã bán' }
 const MAX_SHOWN = 20
@@ -28,6 +29,10 @@ function createBot(token) {
     '/search <từ khoá> – tìm account',
     '/export farm|special|sold|all – nhận file .txt',
     'Gửi file .txt vào chat – import thành 1 batch Green Raid (caption = tên batch, bỏ trống thì lấy tên file)',
+    '/notion <từ khoá> – tìm page/database trong Notion',
+    '/report – gửi báo cáo tuần Notion (vào TELEGRAM_CHAT_ID nếu có, không thì vào chat này)',
+    '/ndb [id|url] – liệt kê dòng của database Notion (mặc định NOTION_DATABASE_ID)',
+    '/npage <id|url> – đọc nội dung 1 page Notion',
     '/whoami – đang xem dữ liệu của user nào',
     '/use <user> – chuyển sang xem dữ liệu của user khác',
     '/users – danh sách user',
@@ -139,6 +144,36 @@ function createBot(token) {
     const name = `${kind}-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.txt`
     return ctx.replyWithDocument(new InputFile(Buffer.from(found.map(r => r.raw).join('\r\n'), 'utf8'), name), { caption: `${found.length} account` })
   }))
+
+  // Telegram giới hạn 4096 ký tự/tin nhắn
+  const cut = s => s.length > 3900 ? s.slice(0, 3900) + '\n…(đã cắt bớt)' : s
+
+  bot.command('notion', guard(async ctx => {
+    const q = (ctx.match || '').trim()
+    return tryDo(ctx, async () => {
+      const found = await notion.search(q)
+      if (!found.length) return 'Không tìm thấy gì (kiểm tra integration đã được share vào page chưa).'
+      return cut(found.map(x => `${x.type === 'database' ? '🗂' : '📄'} ${x.title}\n${x.url}\nid: ${x.id}`).join('\n\n'))
+    })
+  }))
+
+  bot.command('report', guard(async ctx => tryDo(ctx, async () => {
+    const r = await require('./weekly-report.cjs').sendWeeklyReport(process.env.TELEGRAM_CHAT_ID || ctx.chat.id)
+    return r.sent ? 'Đã gửi báo cáo tuần.' : 'Chưa có trang báo cáo cho tuần hiện tại.'
+  })))
+
+  bot.command('ndb',guard(async ctx => tryDo(ctx, async () => {
+    const found = await notion.queryDatabase((ctx.match || '').trim())
+    if (!found.length) return 'Database trống.'
+    return cut(found.map(x => `• ${x.title}` + x.props.map(([k, v]) => `\n   ${k}: ${v}`).join('')).join('\n\n'))
+  })))
+
+  bot.command('npage', guard(async ctx => tryDo(ctx, async () => {
+    const arg = (ctx.match || '').trim()
+    if (!arg) return 'Dùng: /npage <id hoặc url page>'
+    const p = await notion.readPage(arg)
+    return cut(`${p.title}\n${p.url}\n\n${p.text || '(page không có nội dung văn bản)'}`) + (p.more ? '\n…(page còn dài)' : '')
+  })))
 
   // Gửi file .txt vào chat = import thành 1 batch Green Raid của user đang chọn (tên batch = tên file, hoặc caption nếu có)
   bot.on('message:document', withUser(async (ctx, u) => {
