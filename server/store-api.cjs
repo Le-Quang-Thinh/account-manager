@@ -6,8 +6,10 @@
 //   PUT  /api/store   -> ghi đè store của user đang đăng nhập
 //   GET  /api/greenraid  -> {rev, batches, history} của tool Green Raid (null nếu còn trống)
 //   PUT  /api/greenraid  -> {baseRev, batches, history}; 409 nếu baseRev khác rev trên server
+//   GET  /api/eventnotes -> {rev, events} của tab Note event (null nếu còn trống)
+//   PUT  /api/eventnotes -> {baseRev, events}; 409 nếu baseRev khác rev trên server
 const { randomUUID } = require('crypto')
-const { rows, one, tx } = require('./db.cjs')
+const { query, rows, one, tx } = require('./db.cjs')
 const { currentUser, login, logout, sendJson, readJson } = require('./auth.cjs')
 
 // Vercel giới hạn body của function ~4.5MB, nên đây chỉ là chặn trên cho chạy local
@@ -159,6 +161,53 @@ async function greenraid(req, res, user) {
   res.end()
 }
 
+// ----- Note event: cả danh sách event của user là 1 JSON, rev tăng mỗi lần ghi -----
+const EVENT_NOTES_DDL = `CREATE TABLE IF NOT EXISTS event_notes (
+  user_id bigint PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  rev bigint NOT NULL,
+  value text NOT NULL,
+  updated_at bigint NOT NULL
+); ALTER TABLE event_notes ENABLE ROW LEVEL SECURITY`
+let eventNotesReady // tự tạo bảng lần đầu để không phải chạy lại schema.sql thủ công
+const ensureEventNotes = () => eventNotesReady ??= query(EVENT_NOTES_DDL).catch(e => { eventNotesReady = undefined; throw e })
+
+async function readEventNotes(userId) {
+  await ensureEventNotes()
+  const r = await one('SELECT rev, value FROM event_notes WHERE user_id = $1', [userId])
+  return r ? { rev: r.rev, events: JSON.parse(r.value) } : null
+}
+
+function writeEventNotes(userId, j) {
+  return tx(async c => {
+    await lockUser(c, userId)
+    const cur = (await c.query('SELECT rev FROM event_notes WHERE user_id = $1', [userId])).rows[0]?.rev ?? 0
+    if ((j.baseRev | 0) !== cur) throw new RevConflict(String(cur))
+    const rev = cur + 1
+    await c.query(`INSERT INTO event_notes (user_id, rev, value, updated_at) VALUES ($1, $2, $3, $4)
+      ON CONFLICT (user_id) DO UPDATE SET rev = EXCLUDED.rev, value = EXCLUDED.value, updated_at = EXCLUDED.updated_at`,
+    [userId, rev, JSON.stringify(j.events), Date.now()])
+    return rev
+  })
+}
+
+async function eventNotes(req, res, user) {
+  if (req.method === 'GET') return sendJson(res, 200, await readEventNotes(user.id))
+  if (req.method === 'PUT') {
+    let j
+    try { j = await readJson(req, MAX_BYTES) } catch (e) { return sendJson(res, /Content-Type/.test(e.message) ? 415 : /lớn/.test(e.message) ? 413 : 400, { error: e.message }) }
+    if (!j || !Array.isArray(j.events)) return sendJson(res, 400, { error: 'Dữ liệu không hợp lệ' })
+    try {
+      await ensureEventNotes()
+      return sendJson(res, 200, { ok: true, rev: await writeEventNotes(user.id, j) })
+    } catch (e) {
+      if (e instanceof RevConflict) return sendJson(res, 409, { error: 'Dữ liệu đã được sửa ở nơi khác', rev: +e.message })
+      return sendJson(res, 400, { error: 'Không ghi được: ' + e.message })
+    }
+  }
+  res.writeHead(405, { Allow: 'GET, PUT' })
+  res.end()
+}
+
 async function route(req, res) {
   const p = (req.originalUrl || req.url || '').split('?')[0].replace(/^\/api/, '')
   if (p === '/login' && req.method === 'POST') return login(req, res)
@@ -168,6 +217,7 @@ async function route(req, res) {
   if (p === '/me' && req.method === 'GET') return sendJson(res, 200, user)
   if (p === '/store') return store(req, res, user)
   if (p === '/greenraid') return greenraid(req, res, user)
+  if (p === '/eventnotes') return eventNotes(req, res, user)
   sendJson(res, 404, { error: 'Không tìm thấy' })
 }
 

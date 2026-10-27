@@ -83,6 +83,14 @@ create table if not exists greenraid_meta (
   updated_at bigint not null
 );
 
+-- Note event: danh sách event + ghi chú của từng thành viên (JSON), rev để phát hiện sửa từ máy khác
+create table if not exists event_notes (
+  user_id bigint primary key references users(id) on delete cascade,
+  rev bigint not null,
+  value text not null,
+  updated_at bigint not null
+);
+
 -- Telegram: chat đã liên kết và user đang được chọn của chat đó
 create table if not exists telegram_links (
   chat_id bigint primary key,
@@ -106,5 +114,6 @@ alter table greenraid_batches enable row level security;
 alter table greenraid_accounts enable row level security;
 alter table greenraid_history enable row level security;
 alter table greenraid_meta enable row level security;
+alter table event_notes enable row level security;
 alter table telegram_links enable row level security;
 alter table login_fails enable row level security;
