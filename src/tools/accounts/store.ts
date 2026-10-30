@@ -172,10 +172,12 @@ export function importLines(text: string, name?: string): { add: number; dup: nu
 export function farmCount(b: number) { return S.accounts.filter(a => a.batch === b && a.inList !== false && a.status === 'farm').length }
 // Thêm account vào batch có sẵn (b = 0 hoặc batch không tồn tại thì tạo batch mới). Trùng tên ở mọi batch thì bỏ qua.
 // Dòng trùng với account Farm đang ở batch khác thì chuyển account đó sang batch này (không tạo bản sao).
-export function addToBatch(text: string, b: number): { add: number; moved: number; dup: number; batch: number | null } {
+// pos: 'end' (mặc định) xếp account mới ở cuối batch, 'start' xếp ở đầu batch (thứ tự trong batch = thứ tự trong S.accounts).
+export function addToBatch(text: string, b: number, pos: 'start' | 'end' = 'end'): { add: number; moved: number; dup: number; batch: number | null } {
   if (!b || !S.batchMeta[b]) return { ...importLines(text), moved: 0 }
   const byUser = new Map(S.accounts.map(a => [a.user.toLowerCase(), a]))
   const seen = new Set(byUser.keys())
+  const fresh: typeof S.accounts = []
   let add = 0, dup = 0, moved = 0
   for (let line of text.split(/\r?\n/)) {
     line = line.trim()
@@ -183,12 +185,20 @@ export function addToBatch(text: string, b: number): { add: number; moved: numbe
     const u = parseUser(line), k = u.toLowerCase()
     if (seen.has(k)) {
       const ex = byUser.get(k)
-      if (ex && ex.batch !== b && ex.status === 'farm' && ex.inList !== false) { ex.batch = b; byUser.delete(k); moved++ } else dup++
+      if (ex && ex.batch !== b && ex.status === 'farm' && ex.inList !== false) { ex.batch = b; byUser.delete(k); fresh.push(ex); moved++ } else dup++
       continue
     }
     seen.add(k)
-    S.accounts.push({ id: S.seq++, raw: line, user: u, batch: b, status: 'farm', inList: true, note: '', sale: '', soldAt: null, prev: 'special', addedAt: Date.now() })
+    fresh.push({ id: S.seq++, raw: line, user: u, batch: b, status: 'farm', inList: true, note: '', sale: '', soldAt: null, prev: 'special', addedAt: Date.now() })
     add++
+  }
+  if (fresh.length) {
+    const set = new Set(fresh)
+    const rest = S.accounts.filter(a => !set.has(a))
+    const at = pos === 'start' ? rest.findIndex(a => a.batch === b) : -1
+    if (at < 0) rest.push(...fresh); else rest.splice(at, 0, ...fresh)
+    S.accounts.length = 0
+    S.accounts.push(...rest)
   }
   return { add, moved, dup, batch: add || moved ? b : null }
 }

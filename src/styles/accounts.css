@@ -3,6 +3,8 @@
 .selbar.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .selbar.on .btn{background:transparent;color:inherit;border-color:currentColor}
 .selbar.on .btn.star{background:var(--amber);border-color:var(--amber);color:#1C1400}
+.selbar.on .btn.sell{background:#4ADE80;border-color:#4ADE80;color:#052E16;font-weight:600}
+.selbar.on .btn.sell:hover{background:#86EFAC;border-color:#86EFAC}
 .selbar.on .btn:hover{border-color:var(--bg);background:rgba(127,127,127,.25)}
 .selacts{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
 .cb{display:inline-flex;align-items:center;gap:9px;cursor:pointer;min-height:28px;padding:4px}

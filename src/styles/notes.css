@@ -1,0 +1,14 @@
+.nt-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
+.nt-table th, .nt-table td { padding: 3px 8px; border: 1px solid var(--line, rgba(128, 128, 128, .3)); text-align: left; height: 28px; line-height: 20px; }
+.nt-table th { font-weight: 600; background: rgba(128, 128, 128, .12); }
+.nt-table tbody tr:hover { background: rgba(128, 128, 128, .08); }
+.nt-table .c-n { width: 40px; text-align: center; color: var(--mute); }
+.nt-table .c-t { width: 22%; font-weight: 600; }
+.nt-table .c-a { width: 190px; white-space: nowrap; }
+.nt-table .c-a .btn { margin-right: 4px; }
+.nt-table .c-t, .nt-table .c-d { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt-table .c-d { color: var(--mute); font-family: ui-monospace, Consolas, monospace; }
+.nt-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.nt-form .ta-pane { min-height: 110px; resize: vertical; }
+.nt-foot { display: flex; align-items: center; gap: 8px; }
+.nt-foot .sp { flex: 1; }

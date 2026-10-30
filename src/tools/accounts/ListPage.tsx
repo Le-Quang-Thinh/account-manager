@@ -363,7 +363,7 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
   const acts = () => {
     const star = <button className="btn star" onClick={bulk.star}><Icon name="star" size={13} />Đánh dấu Special</button>
     const farm = <button className="btn" onClick={bulk.farm}>Về Farm</button>
-    const sellB = <button className="btn" onClick={bulk.sell}>Bán</button>
+    const sellB = <button className="btn sell" onClick={bulk.sell}>Bán</button>
     const un = <button className="btn" onClick={bulk.unsell}>Hoàn tác bán</button>
     const del = <button className="btn" onClick={bulk.del}>Xoá</button>
     if (tab === 'farm') return <>{star}{locked && farm}{del}</>
