@@ -5,7 +5,7 @@ export const PAGE = 400 // số dòng hiện mỗi lần
 const API = './api/store'
 
 export function defSettings(): Settings { return { chunk: 100, group: 20, crlf: true, view: 'table' } }
-export function fresh(): Store { return { v: 3, settings: defSettings(), accounts: [], seq: 1, batchSeq: 0, batchMeta: {}, tags: [] } }
+export function fresh(): Store { return { v: 3, settings: defSettings(), accounts: [], seq: 1, batchSeq: 0, batchMeta: {}, tags: [], hiddenTags: [] } }
 
 // Chuẩn hoá dữ liệu đọc từ file hoặc file sao lưu (có thể là bản cũ). Trả về null nếu không đúng dạng.
 export function normalize(raw: unknown): Store | null {
@@ -20,6 +20,7 @@ export function normalize(raw: unknown): Store | null {
   j.seq = j.seq || (Math.max(0, ...j.accounts.map((a: Account) => a.id)) + 1)
   j.batchMeta = j.batchMeta || {}
   j.tags = Array.isArray(j.tags) ? j.tags.filter((x: unknown) => typeof x === 'string' && x.trim()).map((x: string) => x.trim()) : []
+  j.hiddenTags = Array.isArray(j.hiddenTags) ? j.hiddenTags.filter((x: unknown) => typeof x === 'string' && j.tags.includes(x)) : []
   let legacy = false
   for (const a of j.accounts as Account[]) {
     if (!a.batch) { a.batch = 1; legacy = true } // dữ liệu bản cũ -> Batch 1
@@ -133,7 +134,18 @@ export function addTags(text: string) { // mỗi dòng (hoặc dấu phẩy) m�
   }
   return n
 }
-export function removeTag(t: string) { const i = S.tags.indexOf(t); if (i >= 0) S.tags.splice(i, 1); return i >= 0 }
+export function removeTag(t: string) {
+  const i = S.tags.indexOf(t)
+  if (i >= 0) S.tags.splice(i, 1)
+  S.hiddenTags = S.hiddenTags.filter(x => x !== t)
+  return i >= 0
+}
+// Ẩn / hiện lại một tag trong ô chọn ghi chú (account đã gắn vẫn giữ nguyên, bộ lọc vẫn thấy)
+export function toggleHiddenTag(t: string) {
+  if (S.hiddenTags.includes(t)) S.hiddenTags = S.hiddenTags.filter(x => x !== t)
+  else S.hiddenTags.push(t)
+}
+export const pickTags = () => S.tags.filter(t => !S.hiddenTags.includes(t)) // tag còn dùng để chọn
 
 export const NL = () => S.settings.crlf ? '\r\n' : '\n'
 export const parseUser = (r: string) => (r.trim().split(/[|:;,\t ]+/)[0]) || r
@@ -222,6 +234,14 @@ export function moveBatch(ids: number[], b: number) {
   let n = 0
   for (const a of list) if (a.batch !== b) { a.batch = b; n++ }
   return { n, batch: b }
+}
+// Xoá hẳn các batch: mọi account thuộc batch (ở mọi tab) và thông tin batch. Số batch không dùng lại.
+export function deleteBatches(bs: number[]) {
+  const set = new Set(bs)
+  const before = S.accounts.length
+  S.accounts = S.accounts.filter(a => !set.has(a.batch))
+  for (const b of set) delete S.batchMeta[b]
+  return before - S.accounts.length
 }
 export function setSpecial(ids: number[], note?: string | null) {
   const set = new Set(ids)

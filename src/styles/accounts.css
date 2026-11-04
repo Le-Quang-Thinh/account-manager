@@ -76,6 +76,8 @@ tr.tray td{padding:0;border-top:10px solid var(--bg);border-bottom:1px solid var
 .ft-new .btn:disabled{opacity:1;background:#2A2230;border-color:#2A2230;color:#9C8DA3;cursor:not-allowed}
 .chip.rm{cursor:default;padding-right:4px}
 .chip.rm button{border:0;background:transparent;color:inherit;cursor:pointer;font-size:15px;line-height:1;padding:0 4px}
+.chip.rm button.hide{font-size:11.5px;text-decoration:underline;opacity:.8}
+.chip.hid{border-style:dashed;background:transparent;color:var(--faint)}
 .chip.on{background:var(--amber);color:#1C1400}
 .chips .none{color:var(--faint);font-size:13px}
 .trayx{margin:0 0 12px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--raised)}

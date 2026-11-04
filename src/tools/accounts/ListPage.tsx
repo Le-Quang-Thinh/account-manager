@@ -4,7 +4,7 @@ import {
   S, STL, fmtDate, noteGroups, noteOrder, inListAccounts, inListFarm,
   chunkByBatch, chunkByNote, rawText, toCSV, setSpecial, setFarm, setNote, sell, unsell,
   editRaw, moveBatch, batchIds, farmCount,
-  confirmList, applyTag, addTags,
+  confirmList, applyTag, addTags, pickTags,
   PAGE,
 } from './store'
 import { stamp, fmtShort, download, copyText } from '../../shared/lib/browser'
@@ -36,7 +36,7 @@ function RawCell({ raw }: { raw: string }) {
 }
 
 function NoteSelect({ a, onPick }: { a: Account; onPick: (a: Account, value: string) => void }) {
-  const opts = S.tags.slice()
+  const opts = pickTags()
   if (a.note && !opts.includes(a.note)) opts.push(a.note)
   return (
     <select className="tag-sel" value={a.note || ''} onChange={e => onPick(a, e.target.value)} aria-label={`Ghi chú cho ${a.user}`}>
@@ -410,7 +410,7 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
         <AddPanel fb={fb} onClose={() => setAdding(false)}
           onDone={(b, msg) => { toast(msg); if (b) { commit(); setAdding(false) } }} />
       )}
-      <FloatTags tags={S.tags} count={sel.size} onTag={bulk.tag} onCreate={createTag} onClear={clear} />
+      <FloatTags tags={pickTags()}count={sel.size} onTag={bulk.tag} onCreate={createTag} onClear={clear} />
       {isNoteTab && noteChips.length > 0 && (
         <div className="notefilter" role="group" aria-label="Lọc theo ghi chú">
           <span className="hint-inline">Lọc ghi chú (cũng áp dụng khi xuất file):</span>
@@ -431,7 +431,7 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
         </label>
         {sel.size > 0 && (
           <div className="selacts">
-            {S.tags.map(t => <button key={t} className="chip" title="Gắn tag cho các account đã chọn" onClick={() => bulk.tag(t)}>{t}</button>)}
+            {pickTags().map(t => <button key={t} className="chip" title="Gắn tag cho các account đã chọn" onClick={() => bulk.tag(t)}>{t}</button>)}
             {acts()}
             <select className="mv-sel" value="" aria-label="Chuyển sang batch khác" onChange={e => doMove(e.target.value)}>
               <option value="">Chuyển batch…</option>

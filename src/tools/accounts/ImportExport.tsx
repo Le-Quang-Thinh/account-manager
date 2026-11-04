@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { ChangeEvent, ReactNode } from 'react'
 import {
   S, save, fresh, normalize, replaceS, isFileStorage, importLines, bulkSpecial, addTags, removeTag,
-  chunkByBatch, chunkByNote, rawText, toCSV, noteOrder,
+  chunkByBatch, chunkByNote, rawText, toCSV, noteOrder, batchIds, batchLabel, deleteBatches, toggleHiddenTag,
 } from './store'
 import { stamp, download } from '../../shared/lib/browser'
 import { makeZip } from '../../shared/lib/zip'
@@ -17,6 +17,7 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
   const [tagIn, setTagIn] = useState('')
   const [chunk, setChunk] = useState(String(s.chunk))
   const [group, setGroup] = useState(String(s.group))
+  const [delSel, setDelSel] = useState<Set<number>>(() => new Set()) // batch đã chọn để xoá
 
   const doImport = () => {
     const r = importLines(imp, impName)
@@ -74,6 +75,20 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
     r.readAsText(f)
     e.target.value = ''
   }
+  const bids = batchIds()
+  const perBatch = new Map<number, number>()
+  for (const a of S.accounts) perBatch.set(a.batch, (perBatch.get(a.batch) || 0) + 1)
+  const delIds = bids.filter(b => delSel.has(b)) // bỏ batch đã biến mất (vd. sau khi khôi phục)
+  const delN = delIds.reduce((n, b) => n + (perBatch.get(b) || 0), 0)
+  const toggleDel = (b: number) => setDelSel(o => { const n = new Set(o); if (n.has(b)) n.delete(b); else n.add(b); return n })
+  const doDelBatches = () => {
+    if (!delIds.length) { toast('Chưa chọn batch nào.'); return }
+    const names = delIds.map(b => 'Batch ' + b).join(', ')
+    if (!confirm(`Xoá hẳn ${delIds.length} batch (${names}) gồm ${delN} account? Account sẽ mất hoàn toàn khỏi mọi tab, kể cả Special và Đã bán.`)) return
+    const n = deleteBatches(delIds)
+    setDelSel(new Set()); setFb('all'); setSel(new Set()); commit()
+    toast(`Đã xoá ${delIds.length} batch, ${n} account.`)
+  }
   const wipe = () => {
     if (confirm('XOÁ TOÀN BỘ dữ liệu? Không thể hoàn tác (hãy sao lưu trước).') && confirm('Chắc chắn xoá hết?')) {
       replaceS(fresh()); onRestored(); commit()
@@ -128,6 +143,25 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
           <div className="row"><B k="csvList">Danh sách .csv</B><B k="csvSpecial">Special .csv</B><B k="csvSold">Đã bán .csv</B>
             <button className="btn" onClick={() => download(`toan-bo-${stamp()}.csv`, toCSV(S.accounts), 'text/csv;charset=utf-8')}>Toàn bộ dữ liệu .csv (kể cả account đã lọc khỏi Danh sách)</button></div>
         </section>
+        <section className="sec"><h2>Xoá batch</h2>
+          <p>Bấm chọn một hoặc nhiều batch rồi bấm Xoá. Toàn bộ account của batch đó sẽ bị xoá hẳn ở mọi tab (kể cả Special và Đã bán). Nên tải file sao lưu trước.</p>
+          <div className="chips">
+            {bids.length ? bids.map(b => (
+              <button key={b} type="button" className={'chip' + (delSel.has(b) ? ' on' : '')} aria-pressed={delSel.has(b)} onClick={() => toggleDel(b)}>
+                {batchLabel(b)} · {perBatch.get(b) || 0}
+              </button>
+            )) : <span className="none">Chưa có batch nào.</span>}
+          </div>
+          {bids.length > 0 && (
+            <div className="row">
+              <button className="btn" onClick={() => setDelSel(new Set(delIds.length === bids.length ? [] : bids))}>{delIds.length === bids.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}</button>
+              <span className="sp" />
+              <button className="btn danger" disabled={!delIds.length} onClick={doDelBatches}>
+                {delIds.length ? `Xoá ${delIds.length} batch (${delN} account)` : 'Xoá batch đã chọn'}
+              </button>
+            </div>
+          )}
+        </section>
         <section className="sec"><h2>Cài đặt ghi chú: danh sách lựa chọn</h2>
           <p>Ghi chú là danh sách lựa chọn. Nhập các lựa chọn ở đây (cách nhau bằng dấu phẩy), ví dụ <code>pikachu</code>. Ở các tab, ô ghi chú của mỗi dòng là ô chọn: chọn <code>pikachu</code> là xong, account ở Farm sẽ tự chuyển sang Special. Tick nhiều account thì bấm nút lựa chọn trên thanh chọn để gắn cho cả loạt. Xoá một lựa chọn không làm mất ghi chú đã gắn.</p>
           <div className="row">
@@ -135,10 +169,17 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
             <button className="btn solid" onClick={addTag}>Thêm lựa chọn</button>
           </div>
           <div className="chips">
-            {S.tags.length ? S.tags.map(t => (
-              <span key={t} className="chip rm">{t}<button aria-label={`Xoá tag ${t}`} onClick={() => { removeTag(t); commit() }}>×</button></span>
-            )) : <span className="none">Chưa có tag nào.</span>}
+            {S.tags.length ? S.tags.map(t => {
+              const hidden = S.hiddenTags.includes(t)
+              return (
+                <span key={t} className={'chip rm' + (hidden ? ' hid' : '')} title={hidden ? 'Đã ẩn khỏi ô chọn, vẫn lọc được' : undefined}>{t}
+                  <button className="hide" aria-label={`${hidden ? 'Hiện lại' : 'Ẩn'} tag ${t}`} onClick={() => { toggleHiddenTag(t); commit() }}>{hidden ? 'Hiện' : 'Ẩn'}</button>
+                  <button aria-label={`Xoá tag ${t}`} onClick={() => { removeTag(t); commit() }}>×</button>
+                </span>
+              )
+            }) : <span className="none">Chưa có tag nào.</span>}
           </div>
+          {S.hiddenTags.length > 0 && <p className="hint">Đang ẩn {S.hiddenTags.length} lựa chọn: không hiện trong ô chọn và nút gắn tag, nhưng vẫn có trong bộ lọc ghi chú và sắp xếp ở tab Special / Đã bán. Account đã gắn giữ nguyên ghi chú.</p>}
         </section>
         <section className="sec"><h2>Cài đặt</h2>
           <div className="row">
