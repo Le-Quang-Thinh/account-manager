@@ -282,24 +282,63 @@ export function setNote(ids: number[], note?: string) {
   for (const a of S.accounts) if (set.has(a.id)) { a.note = (note || '').trim(); n++ }
   return n
 }
-// Dán danh sách special: mỗi dòng "account:password # ghi chú" (hoặc chỉ tên tài khoản)
+// Chuẩn hoá log copy từ Google Sheet (cột cách nhau bằng tab) thành "username:pass # pokemon_name[_size]".
+// Size chỉ gắn khi là XXS/XXL. Dòng không có username bị bỏ qua. Trả null nếu text không phải dạng log.
+const LOG_COLS = { user: 3, name: 7, size: 25 } // vị trí cột khi copy không kèm dòng header
+export function logToSpecial(text: string, pass: string) {
+  const rows = text.split(/\r?\n/).filter(l => l.trim()).map(l => l.split('\t'))
+  if (!rows.length) return null
+  const head = rows[0].map(h => h.trim().toLowerCase())
+  let col = LOG_COLS
+  if (head.includes('username') && head.includes('pokemon_name')) {
+    col = { user: head.indexOf('username'), name: head.indexOf('pokemon_name'), size: head.indexOf('size') }
+    rows.shift()
+  } else if (!rows.every(r => r.length > LOG_COLS.size)) return null
+  const lines: string[] = []
+  let skipped = 0
+  for (const r of rows) {
+    const user = (r[col.user] || '').trim(), name = (r[col.name] || '').trim()
+    if (!user) { skipped++; continue }
+    const size = col.size >= 0 ? (r[col.size] || '').trim().toUpperCase() : ''
+    const note = name + (size === 'XXS' || size === 'XXL' ? '_' + size : '')
+    lines.push(`${user}:${pass}` + (note ? ' # ' + note : ''))
+  }
+  return { lines, skipped }
+}
+
+// Dán danh sách special: mỗi dòng "account:password # ghi chú" (hoặc chỉ tên tài khoản).
+// Account không có ở batch nào thì tạo mới vào batch "unknown" (dùng lại nếu đã có) ở trạng thái Special.
+// miss: chỉ còn các dòng trùng account đã bán (không đụng tới).
+export const UNKNOWN_BATCH = 'unknown'
 export function bulkSpecial(text: string) {
   const idx = new Map<string, Account>()
-  for (const a of S.accounts) if (a.status !== 'sold') idx.set(a.user.toLowerCase(), a)
-  let n = 0
+  for (const a of S.accounts) idx.set(a.user.toLowerCase(), a)
+  let n = 0, created = 0, batch: number | null = null
   const miss: string[] = []
   for (let line of text.split(/\r?\n/)) {
     line = line.trim()
     if (!line) continue
     const p = line.indexOf('#')
     const acc = (p >= 0 ? line.slice(0, p) : line).trim(), note = p >= 0 ? line.slice(p + 1).trim() : ''
-    const a = idx.get(parseUser(acc).toLowerCase())
-    if (!a) { miss.push(line); continue }
-    a.status = 'special'
-    if (note) a.note = note
-    n++
+    const u = parseUser(acc), k = u.toLowerCase()
+    if (!u) continue
+    const a = idx.get(k)
+    if (a?.status === 'sold') { miss.push(line); continue }
+    if (a) { a.status = 'special'; if (note) a.note = note; n++; continue }
+    if (batch == null) batch = unknownBatch()
+    const x: Account = { id: S.seq++, raw: acc, user: u, batch, status: 'special', inList: true, note, sale: '', soldAt: null, prev: 'special', addedAt: Date.now() }
+    S.accounts.push(x)
+    idx.set(k, x)
+    created++
   }
-  return { n, miss }
+  return { n, created, batch, miss }
+}
+function unknownBatch() {
+  const b = Object.keys(S.batchMeta).map(Number).find(b => S.batchMeta[b]?.name === UNKNOWN_BATCH)
+  if (b) return b
+  const nb = ++S.batchSeq
+  S.batchMeta[nb] = { at: Date.now(), name: UNKNOWN_BATCH }
+  return nb
 }
 // XÁC NHẬN: loại Special và Đã bán khỏi tab Danh sách, chỉ để lại Farm.
 // Dữ liệu không mất: Special/Đã bán vẫn còn nguyên ở tab riêng của chúng.

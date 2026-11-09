@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import type { ChangeEvent, ReactNode } from 'react'
+import type { ChangeEvent, ClipboardEvent, ReactNode } from 'react'
 import {
-  S, save, fresh, normalize, replaceS, isFileStorage, importLines, bulkSpecial, addTags, removeTag,
+  S, save, fresh, normalize, replaceS, isFileStorage, importLines, bulkSpecial, logToSpecial, addTags, removeTag,
   chunkByBatch, chunkByNote, rawText, toCSV, noteOrder, batchIds, batchLabel, deleteBatches, toggleHiddenTag,
 } from './store'
 import { stamp, download } from '../../shared/lib/browser'
@@ -14,6 +14,7 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
   const [imp, setImp] = useState('')
   const [impName, setImpName] = useState('')
   const [sp, setSp] = useState('')
+  const [spPass, setSpPass] = useState('Gamepika238@') // mật khẩu gắn vào khi dán log từ Google Sheet
   const [tagIn, setTagIn] = useState('')
   const [chunk, setChunk] = useState(String(s.chunk))
   const [group, setGroup] = useState(String(s.group))
@@ -35,10 +36,20 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
     if (!sp.trim()) { toast('Chưa dán danh sách.'); return }
     const r = bulkSpecial(sp)
     commit()
-    if (r.miss.length) {
-      setSp(r.miss.join('\n'))
-      toast(`Đã chuyển ${r.n} account sang Special. Không tìm thấy ${r.miss.length} dòng (để lại trong ô).`)
-    } else { setSp(''); toast(`Đã chuyển ${r.n} account sang Special.`) }
+    let msg = `Đã chuyển ${r.n} account sang Special.`
+    if (r.created) msg += ` Tạo mới ${r.created} account không có trong danh sách vào ${batchLabel(r.batch!)}.`
+    if (r.miss.length) msg += ` Bỏ qua ${r.miss.length} dòng trùng account đã bán (để lại trong ô).`
+    setSp(r.miss.join('\n'))
+    if (r.created) { goTab('special'); setFb(r.batch!) } // mở luôn batch unknown để thấy account vừa tạo
+    toast(msg)
+  }
+  // Dán log Google Sheet: tự chuẩn hoá thành "username:pass # pokemon_name[_size]" rồi nối vào ô
+  const pasteLog = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const r = logToSpecial(e.clipboardData.getData('text'), spPass.trim())
+    if (!r) return // không phải log, dán bình thường
+    e.preventDefault()
+    if (r.lines.length) setSp(v => (v.trim() ? v.replace(/\s*$/, '') + '\n' : '') + r.lines.join('\n'))
+    toast(`Đã chuẩn hoá ${r.lines.length} dòng từ log` + (r.skipped ? `, bỏ ${r.skipped} dòng không có username.` : '.'))
   }
   const readFiles = (e: ChangeEvent<HTMLInputElement>) => {
     ;[...(e.target.files || [])].forEach(f => {
@@ -132,8 +143,12 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
           </div>
         </section>
         <section className="sec"><h2>Đánh dấu Special hàng loạt</h2>
-          <p>Nếu bạn đã có sẵn danh sách special, dán vào đây, mỗi dòng <code>account:password # ghi chú</code> hoặc chỉ tên account. Phần ghi chú sau dấu # có thể bỏ trống. Tool tự tìm account ở mọi batch.</p>
-          <textarea className="ta" style={{ minHeight: 110 }} value={sp} onChange={e => setSp(e.target.value)} placeholder={'account5:pass5 # skin hiếm\naccount9 # rank cao'} aria-label="Danh sách special" />
+          <p>Nếu bạn đã có sẵn danh sách special, dán vào đây, mỗi dòng <code>account:password # ghi chú</code> hoặc chỉ tên account. Phần ghi chú sau dấu # có thể bỏ trống. Tool tự tìm account ở mọi batch; account không có ở batch nào sẽ được tạo mới vào batch <code>unknown</code> và đánh dấu Special luôn.</p>
+          <p>Có thể copy thẳng các dòng log từ Google Sheet (kèm hoặc không kèm dòng header) và dán vào: tool tự đổi thành <code>username:mật khẩu # pokemon_name</code>, thêm <code>_XXS</code> / <code>_XXL</code> nếu size là XXS hoặc XXL. Dòng không có username sẽ bị bỏ qua.</p>
+          <div className="row">
+            <input className="inp" type="text" value={spPass} onChange={e => setSpPass(e.target.value)} placeholder="Mật khẩu khi dán log" aria-label="Mật khẩu gắn vào khi dán log" style={{ minWidth: 230 }} />
+          </div>
+          <textarea className="ta" style={{ minHeight: 110 }} value={sp} onChange={e => setSp(e.target.value)} onPaste={pasteLog} placeholder={'account5:pass5 # skin hiếm\naccount9 # rank cao\n(hoặc dán log từ Google Sheet)'} aria-label="Danh sách special" />
           <div className="row"><button className="btn star" onClick={doBulk}>Chuyển sang Special</button></div>
         </section>
         <section className="sec"><h2>Xuất file</h2>
