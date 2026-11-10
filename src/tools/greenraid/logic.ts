@@ -26,17 +26,21 @@ export type StatusFilter = 'all' | 'todo' | 'success' | FailLabel
 export type SummaryFilter = 'processed' | 'success' | 'special' | 'fail'
 export type OutFilter = 'success' | FailLabel | null
 
+// Nhãn lỗi gộp sẵn vào "Tổng danh sách" để copy và đánh dấu lại
+export const RETRY_LABELS: FailLabel[] = ['fail_2_4', 'fail_walk']
+
 export interface EvState {
   batches: EvBatch[]
   history: ExportRecord[]
   selectedId: string
   search: string
   filter: StatusFilter
-  view: 'batch' | 'summary'
+  view: 'batch' | 'summary' | 'retry'
   leftTab: 'active' | 'done'
   exportTab: 'ready' | 'done'
   summaryFilter: SummaryFilter
   outFilter: OutFilter
+  failView: 'list' | 'text'
 }
 
 export const STORE_KEY = 'event-account-manager-v2-preview-safe'
@@ -46,7 +50,7 @@ export const BLOCK_SIZE = 20
 
 export const initialState: EvState = {
   batches: [], history: [], selectedId: '', search: '', filter: 'all', view: 'batch',
-  leftTab: 'active', exportTab: 'ready', summaryFilter: 'processed', outFilter: null,
+  leftTab: 'active', exportTab: 'ready', summaryFilter: 'processed', outFilter: null, failView: 'list',
 }
 
 let seq = 0
@@ -179,21 +183,24 @@ export function saveState(s: EvState, userKey: string): boolean {
   } catch (e) { return false }
 }
 
-// ===== xuất 1000 =====
-export function planExport(batches: EvBatch[]) {
+// ===== xuất theo số lượng =====
+// Trả về toàn bộ account đủ điều kiện (đã tick, không lỗi, không Special, chưa xuất, không trùng dòng).
+// Component sẽ cắt theo số lượng người dùng nhập.
+export function planExport(batches: EvBatch[], limit = EXPORT_LIMIT) {
   // dòng đã xuất trước đó, trên toàn bộ batch
   const seen = new Set<string>()
   for (const b of batches) for (const a of b.accounts) if (a.exported) seen.add(a.text.trim())
-  const picked: EvAccount[] = []
+  const eligible: EvAccount[] = []
   let dupes = 0
   for (const b of batches) for (const a of b.accounts) {
     if (!a.checked || a.failLabel || a.special || a.exported) continue
     const key = a.text.trim()
     if (seen.has(key)) { dupes++; continue }
     seen.add(key)
-    if (picked.length < EXPORT_LIMIT) picked.push(a)
+    eligible.push(a)
   }
-  return { picked, dupes }
+  const n = Number.isFinite(limit) && limit >= 0 ? Math.min(limit, eligible.length) : eligible.length
+  return { picked: eligible.slice(0, n), eligible, available: eligible.length, dupes }
 }
 
 export const lineOf = (a: EvAccount) => a.failLabel ? `${a.text}\t[${a.failLabel}]` : a.text
@@ -206,6 +213,33 @@ export function outAccounts(batches: EvBatch[], f: Exclude<OutFilter, null>) {
     out.push(a)
   }
   return out
+}
+
+// ===== tổng danh sách lỗi cần làm lại (Fail 2-4, Fail Walk…) =====
+// Gom theo batch các account đã tick, mang nhãn lỗi nằm trong tập labels, chưa xuất.
+export function retryGroups(batches: EvBatch[], labels: Set<FailLabel>) {
+  const groups: { batch: EvBatch; batchNo: number; items: { acc: EvAccount; no: number }[] }[] = []
+  let total = 0
+  batches.forEach((batch, bi) => {
+    const items: { acc: EvAccount; no: number }[] = []
+    let n = 0
+    for (const acc of batch.accounts) {
+      if (acc.exported) continue
+      n++
+      if (acc.checked && acc.failLabel && labels.has(acc.failLabel)) { items.push({ acc, no: n }); total++ }
+    }
+    if (items.length) groups.push({ batch, batchNo: bi + 1, items })
+  })
+  return { groups, total }
+}
+
+// Đếm nhanh số account khớp tập nhãn mặc định (cho nút ở thanh bên)
+export function retryCount(batches: EvBatch[], labels: Set<FailLabel>) {
+  let n = 0
+  for (const b of batches) for (const a of b.accounts) {
+    if (!a.exported && a.checked && a.failLabel && labels.has(a.failLabel)) n++
+  }
+  return n
 }
 
 export function summaryRows(batches: EvBatch[], f: SummaryFilter) {

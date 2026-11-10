@@ -14,6 +14,9 @@
 .ev-tabs.ex button.on{color:#2dd4bf;border-bottom-color:#2dd4bf}
 .ev-tabs.top{padding:0 12px;margin-bottom:10px}
 .ev-tabs i{font-style:normal;font-weight:500;opacity:.7;margin-left:4px}
+.ev-retry-btn{width:100%;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:4px;font-weight:600}
+.ev-retry-btn.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.ev-retry-btn i{font-style:normal;font-weight:700;opacity:.85}
 
 .ev-list{display:flex;flex-direction:column;gap:6px;padding:0 10px 10px;max-height:calc(100vh - 250px);overflow:auto}
 .ev-batch{display:flex;align-items:center;gap:2px;border:1px solid var(--line);border-radius:8px;background:var(--raised);padding:2px 4px 2px 0}
@@ -57,12 +60,18 @@
 .ev-chip.on{background:var(--c);color:#000001}
 .ev-out-bar{display:flex;align-items:center;gap:8px;margin-bottom:4px}
 .ev-ta{min-height:200px;border:1px solid var(--line);border-radius:6px}
+.ev-ta.tall{width:100%;min-height:min(60vh,520px)}
 .ev-file{display:flex;gap:6px;margin-top:8px}
 .ev-file .inp{flex:1;min-width:0}
 .ev-export{border-top:1px solid var(--line)}
 .ev-ex-body{padding:10px 12px;display:flex;flex-direction:column;gap:8px;max-height:320px;overflow:auto}
 .ev-ex-body p{margin:0}
 .ev-ready{font-size:14px}.ev-ready b{font-size:22px;color:#2dd4bf}
+.ev-qty{display:flex;align-items:center;gap:8px;font-size:13px}
+.ev-qty span{white-space:nowrap}
+.ev-qty .inp{flex:1;min-width:0;border:1px solid var(--line);background:var(--raised);border-radius:6px;padding:6px 10px;font-size:14px;text-align:right}
+.ev-qty-quick{display:flex;flex-wrap:wrap;gap:6px}
+.ev-qty-quick .btn{flex:1;min-width:52px}
 .ev-go{width:100%;background:#0f766e;border-color:#0f766e;color:#fff;font-weight:700}
 .ev-hist{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:6px;padding:6px 8px}
 .ev-hist-n{flex:1;min-width:0;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis}

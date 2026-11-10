@@ -1,8 +1,8 @@
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import type { ChangeEvent, Dispatch } from 'react'
 import {
-  BLOCK_SIZE, EXPORT_LIMIT, FAIL_LABELS, batchStats, failName, isComplete, isDrained, lineOf, loadState, makeBatch,
-  matchesStatus, outAccounts, planExport, reducer, saveState, summaryRows,
+  BLOCK_SIZE, FAIL_LABELS, RETRY_LABELS, batchStats, failName, isComplete, isDrained, lineOf, loadState, makeBatch,
+  matchesStatus, outAccounts, planExport, reducer, retryCount, retryGroups, saveState, summaryRows,
 } from './logic'
 import type { Action, EvAccount, EvBatch, EvState, ExportRecord, FailLabel, OutFilter, StatusFilter, SummaryFilter } from './logic'
 import { pull, push } from './sync'
@@ -10,9 +10,9 @@ import type { Remote } from './sync'
 import { copyText, download, readTextFile, withTxt } from '../../shared/lib/browser'
 
 const pad = (n: number) => String(n).padStart(2, '0')
-const exportName = () => {
+const exportName = (count: number) => {
   const d = new Date()
-  return `success_1000_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.txt`
+  return `success_${count}_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.txt`
 }
 
 const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
@@ -104,6 +104,7 @@ Mục "Xem" trong lịch sử Đã xuất sẽ không còn hiện nội dung c�
   const active = s.batches.filter(b => !isComplete(b))
   const list = s.leftTab === 'active' ? active : done
   const drained = done.filter(isDrained)
+  const retryN = retryCount(s.batches, new Set(RETRY_LABELS))
   return (
     <aside className="pane ev-col">
       <div className="pane-h"><h3>Event Batches</h3></div>
@@ -117,6 +118,12 @@ Mục "Xem" trong lịch sử Đã xuất sẽ không còn hiện nội dung c�
           <button type="button" role="tab" aria-selected={s.leftTab === 'done'} className={s.leftTab === 'done' ? 'on' : ''}
             onClick={() => dispatch({ type: 'ui', patch: { leftTab: 'done' } })}>Đã thành công <i>{done.length}</i></button>
         </div>
+        {s.leftTab === 'active' && (
+          <button type="button" className={'btn ev-retry-btn' + (s.view === 'retry' ? ' on' : '')} aria-pressed={s.view === 'retry'}
+            onClick={() => dispatch({ type: 'ui', patch: { view: 'retry' } })}>
+            Tổng danh sách <i>{retryN}</i>
+          </button>
+        )}
       </div>
       {s.leftTab === 'done' && done.length > 0 && (
         <div className="ev-pad ev-clean">
@@ -254,9 +261,71 @@ function SummaryView({ s, dispatch, onOpen }: { s: EvState; dispatch: Dispatch<A
   )
 }
 
+// ===== Tổng danh sách lỗi cần làm lại (Fail 2-4, Fail Walk…) =====
+function RetryView({ s, dispatch, toast, flashId }: { s: EvState; dispatch: Dispatch<Action>; toast: (m: string) => void; flashId: string }) {
+  const [picked, setPicked] = useState<Set<FailLabel>>(() => new Set(RETRY_LABELS))
+  const taRef = useRef<HTMLTextAreaElement>(null)
+  const { groups, total } = useMemo(() => retryGroups(s.batches, picked), [s.batches, picked])
+  const text = useMemo(() => groups.flatMap(g => g.items.map(it => it.acc.text)).join('\n'), [groups])
+
+  const togglePick = (id: FailLabel) => setPicked(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next.size ? next : prev // luôn giữ ít nhất một nhãn
+  })
+  const copy = () => {
+    if (!text) return
+    copyText(text).then(() => toast(`Đã copy ${total} account`)).catch(() => {
+      taRef.current?.select()
+      toast('Trình duyệt chặn clipboard. Đã bôi đen sẵn, hãy bấm Ctrl+C')
+    })
+  }
+
+  return (
+    <>
+      <div className="ev-head">
+        <h2>Tổng danh sách lỗi</h2>
+        <span className="sp" />
+        <div className="seg" role="group" aria-label="Kiểu hiển thị">
+          <button type="button" className={s.failView === 'list' ? 'on' : ''} aria-pressed={s.failView === 'list'}
+            onClick={() => dispatch({ type: 'ui', patch: { failView: 'list' } })}>Danh sách</button>
+          <button type="button" className={s.failView === 'text' ? 'on' : ''} aria-pressed={s.failView === 'text'}
+            title="Hiện dạng văn bản để bôi đen và Ctrl+C" onClick={() => dispatch({ type: 'ui', patch: { failView: 'text' } })}>Văn bản</button>
+        </div>
+        <button type="button" className="btn sm solid" disabled={!text} onClick={copy}>Copy ({total})</button>
+      </div>
+      <p className="dim">Gộp các account đã tick và gán nhãn lỗi bên dưới (chưa xuất). Copy để làm lại, hoặc đổi nhãn/bỏ tick để đánh dấu đã xong.</p>
+      <div className="ev-chips">
+        {FAIL_LABELS.map(f => (
+          <button key={f.id} type="button" aria-pressed={picked.has(f.id)}
+            className={'ev-chip f-' + f.id + (picked.has(f.id) ? ' on' : '')} onClick={() => togglePick(f.id)}>{f.label}</button>
+        ))}
+      </div>
+      {total === 0 ? (
+        <p className="pane-empty">Không có account nào mang nhãn lỗi đã chọn.</p>
+      ) : s.failView === 'text' ? (
+        <textarea ref={taRef} className="ta-pane out ev-ta tall" readOnly wrap="off" spellCheck={false} aria-label="Danh sách để copy" value={text} />
+      ) : (
+        groups.map(g => (
+          <section key={g.batch.id} className="ev-block">
+            <div className="ev-block-h"><div><b>Nhóm {g.batchNo} · {g.batch.name}</b><div className="dim">{g.items.length} account</div></div></div>
+            {g.items.map(({ acc, no }) => (
+              <Row key={acc.id} a={acc} no={no} batchId={g.batch.id} dispatch={dispatch} flash={acc.id === flashId} />
+            ))}
+          </section>
+        ))
+      )}
+    </>
+  )
+}
+
 // ===== cột phải =====
 function ExportPanel({ s, dispatch, toast }: { s: EvState; dispatch: Dispatch<Action>; toast: (m: string) => void }) {
-  const plan = useMemo(() => planExport(s.batches), [s.batches])
+  const [qty, setQty] = useState('')
+  const qtyNum = parseInt(qty, 10)
+  // input rỗng hoặc không hợp lệ => lấy tất cả account sẵn sàng
+  const limit = qty.trim() !== '' && Number.isFinite(qtyNum) && qtyNum > 0 ? qtyNum : Infinity
+  const plan = useMemo(() => planExport(s.batches, limit), [s.batches, limit])
   const [override, setOverride] = useState<{ text: string; name: string } | null>(null)
   const [name, setName] = useState('')
   const taRef = useRef<HTMLTextAreaElement>(null)
@@ -283,10 +352,11 @@ function ExportPanel({ s, dispatch, toast }: { s: EvState; dispatch: Dispatch<Ac
   }
   const exportNow = () => {
     if (!plan.picked.length) return
-    const fileName = exportName()
+    const fileName = exportName(plan.picked.length)
     const record = { id: `ex-${Date.now().toString(36)}`, name: fileName, count: plan.picked.length, createdAt: Date.now() }
     download(fileName, plan.picked.map(a => a.text).join('\n'))
     dispatch({ type: 'export', ids: new Set(plan.picked.map(a => a.id)), record })
+    setQty('')
     toast(`Đã xuất ${record.count} account${plan.dupes ? `, bỏ ${plan.dupes} trùng` : ''}`)
   }
   const view = (id: string, fileName: string) => {
@@ -321,17 +391,34 @@ function ExportPanel({ s, dispatch, toast }: { s: EvState; dispatch: Dispatch<Ac
       </div>
 
       <div className="ev-export">
-        <div className="ev-tabs ex" role="tablist" aria-label="Xuất 1000">
+        <div className="ev-tabs ex" role="tablist" aria-label="Lấy account">
           <button type="button" role="tab" aria-selected={s.exportTab === 'ready'} className={s.exportTab === 'ready' ? 'on' : ''}
-            onClick={() => dispatch({ type: 'ui', patch: { exportTab: 'ready' } })}>Xuất {EXPORT_LIMIT}</button>
+            onClick={() => dispatch({ type: 'ui', patch: { exportTab: 'ready' } })}>Lấy account</button>
           <button type="button" role="tab" aria-selected={s.exportTab === 'done'} className={s.exportTab === 'done' ? 'on' : ''}
             onClick={() => dispatch({ type: 'ui', patch: { exportTab: 'done' } })}>Đã xuất <i>{s.history.length}</i></button>
         </div>
         {s.exportTab === 'ready' ? (
           <div className="ev-ex-body">
-            <p className="ev-ready"><b>{plan.picked.length}</b>/{EXPORT_LIMIT} sẵn sàng{plan.dupes > 0 && <span className="c-bad"> · bỏ {plan.dupes} trùng</span>}</p>
+            <p className="ev-ready"><b>{plan.available}</b> account sẵn sàng{plan.dupes > 0 && <span className="c-bad"> · bỏ {plan.dupes} trùng</span>}</p>
             <p className="dim">Chỉ lấy account đã tick, không lỗi, không Special, chưa xuất; bỏ dòng trùng.</p>
-            <button type="button" className="btn solid ev-go" disabled={!plan.picked.length} onClick={exportNow}>Xuất & tải file</button>
+            <label className="ev-qty">
+              <span>Số lượng cần lấy</span>
+              <input className="inp" type="number" inputMode="numeric" min={1} max={plan.available || undefined}
+                placeholder={`Tất cả (${plan.available})`} value={qty}
+                onChange={e => setQty(e.target.value.replace(/[^\d]/g, ''))} />
+            </label>
+            <div className="ev-qty-quick">
+              {[100, 200, 500, 1000].map(n => (
+                <button key={n} type="button" className="btn sm" disabled={n > plan.available} onClick={() => setQty(String(n))}>{n}</button>
+              ))}
+              <button type="button" className="btn sm" disabled={!plan.available} onClick={() => setQty(String(plan.available))}>Tất cả</button>
+            </div>
+            <button type="button" className="btn solid ev-go" disabled={!plan.picked.length} onClick={exportNow}>
+              Lấy {plan.picked.length} account & đánh dấu đã xuất
+            </button>
+            {qtyNum > plan.available && (
+              <p className="dim">Chỉ còn {plan.available} account sẵn sàng, sẽ lấy hết {plan.available}.</p>
+            )}
           </div>
         ) : (
           <div className="ev-ex-body">
@@ -469,7 +556,7 @@ export default function GreenRaidTool({ toast, userKey }: { toast: (m: string) =
     <div className="ev">
       <div className="ev-top">
         <h1>Quản lý event</h1>
-        <p className="sub">Tick account đã xử lý, gán nhãn lỗi, đánh dấu Special rồi xuất {EXPORT_LIMIT} account Success.
+        <p className="sub">Tick account đã xử lý, gán nhãn lỗi, đánh dấu Special rồi nhập số lượng để lấy account Success ra.
           {' '}<span className="dim">{{ saved: '· Đã lưu lên server', saving: '· Đang lưu…', error: '· Chưa lưu được lên server, sẽ thử lại khi có thay đổi', local: '· Chỉ lưu trên máy này' }[sync]}</span></p>
       </div>
       {!ready && <p className="loading" role="status">Đang đồng bộ với server…</p>}
@@ -486,8 +573,10 @@ export default function GreenRaidTool({ toast, userKey }: { toast: (m: string) =
           <div className="ev-pad">
             {s.view === 'summary'
               ? <SummaryView s={s} dispatch={dispatch} onOpen={openAt} />
-              : batch ? <BatchView s={s} batch={batch} dispatch={dispatch} flashId={flashId} />
-                : <p className="pane-empty">Chọn hoặc import một batch để bắt đầu.</p>}
+              : s.view === 'retry'
+                ? <RetryView s={s} dispatch={dispatch} toast={toast} flashId={flashId} />
+                : batch ? <BatchView s={s} batch={batch} dispatch={dispatch} flashId={flashId} />
+                  : <p className="pane-empty">Chọn hoặc import một batch để bắt đầu.</p>}
           </div>
         </section>
         <ExportPanel s={s} dispatch={dispatch} toast={toast} />
