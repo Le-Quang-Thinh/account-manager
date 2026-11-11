@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { ChangeEvent, ClipboardEvent, ReactNode } from 'react'
 import {
   S, save, fresh, normalize, replaceS, isFileStorage, importLines, bulkSpecial, logToSpecial, addTags, removeTag,
-  chunkByBatch, chunkByNote, rawText, toCSV, noteOrder, batchIds, batchLabel, deleteBatches, toggleHiddenTag,
+  chunkByBatch, chunkByNote, rawText, toCSV, noteOrder, batchIds, batchLabel, deleteBatches, mergeBatches, toggleHiddenTag,
 } from './store'
 import { stamp, download } from '../../shared/lib/browser'
 import { makeZip } from '../../shared/lib/zip'
@@ -19,6 +19,10 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
   const [chunk, setChunk] = useState(String(s.chunk))
   const [group, setGroup] = useState(String(s.group))
   const [delSel, setDelSel] = useState<Set<number>>(() => new Set()) // batch đã chọn để xoá
+  const [mrgSel, setMrgSel] = useState<Set<number>>(() => new Set()) // batch đã chọn để gộp
+  const [mrgTarget, setMrgTarget] = useState(0) // batch đích khi gộp (0 = tạo batch mới)
+  const [mrgDedupe, setMrgDedupe] = useState(true) // lọc trùng tài khoản khi gộp
+  const [mrgName, setMrgName] = useState('') // tên batch mới khi gộp vào batch mới
 
   const doImport = () => {
     const r = importLines(imp, impName)
@@ -100,6 +104,22 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
     setDelSel(new Set()); setFb('all'); setSel(new Set()); commit()
     toast(`Đã xoá ${delIds.length} batch, ${n} account.`)
   }
+  const mrgIds = bids.filter(b => mrgSel.has(b)) // bỏ batch đã biến mất
+  const mrgN = mrgIds.reduce((n, b) => n + (perBatch.get(b) || 0), 0)
+  // batch đích hợp lệ = batch đang được chọn; nếu không, coi như tạo batch mới
+  const effTarget = mrgTarget && mrgIds.includes(mrgTarget) ? mrgTarget : 0
+  const toggleMrg = (b: number) => setMrgSel(o => { const n = new Set(o); if (n.has(b)) n.delete(b); else n.add(b); return n })
+  const doMerge = () => {
+    if (mrgIds.length < 2) { toast('Hãy chọn ít nhất 2 batch để gộp.'); return }
+    const into = effTarget ? batchLabel(effTarget) : 'một batch mới' + (mrgName.trim() ? ` (${mrgName.trim()})` : '')
+    if (!confirm(`Gộp ${mrgIds.length} batch (${mrgN} account) vào ${into}?` + (mrgDedupe ? '\nAccount trùng tên tài khoản sẽ bị bỏ bớt, giữ bản nhiều thông tin nhất (Đã bán > Special > Farm).' : ''))) return
+    const r = mergeBatches(mrgIds, effTarget, mrgDedupe, mrgName)
+    setMrgSel(new Set()); setMrgTarget(0); setMrgName('')
+    setFb(r.target ?? 'all'); setSel(new Set()); commit()
+    let msg = `Đã gộp ${r.sources} batch vào ${batchLabel(r.target!)}: dồn ${r.moved} account.`
+    if (mrgDedupe) msg += r.removed ? ` Bỏ ${r.removed} account trùng tên.` : ' Không có account trùng tên.'
+    toast(msg)
+  }
   const wipe = () => {
     if (confirm('XOÁ TOÀN BỘ dữ liệu? Không thể hoàn tác (hãy sao lưu trước).') && confirm('Chắc chắn xoá hết?')) {
       replaceS(fresh()); onRestored(); commit()
@@ -175,6 +195,39 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
                 {delIds.length ? `Xoá ${delIds.length} batch (${delN} account)` : 'Xoá batch đã chọn'}
               </button>
             </div>
+          )}
+        </section>
+        <section className="sec"><h2>Gộp batch</h2>
+          <p>Chọn từ 2 batch trở lên để gộp chung thành một batch. Chọn batch đích ở ô bên dưới (hoặc tạo batch mới). Account được giữ nguyên, chỉ dồn về batch đích. Bật <b>Lọc trùng tài khoản</b> để bỏ account trùng tên tài khoản khi gộp — nếu trùng, tool giữ bản nhiều thông tin nhất (Đã bán &gt; Special &gt; Farm, ưu tiên bản có ghi chú). Dữ liệu bình thường mỗi tài khoản chỉ ở một batch nên thường không có dòng nào bị bỏ.</p>
+          <div className="chips">
+            {bids.length ? bids.map(b => (
+              <button key={b} type="button" className={'chip' + (mrgSel.has(b) ? ' on' : '')} aria-pressed={mrgSel.has(b)} onClick={() => toggleMrg(b)}>
+                {batchLabel(b)} · {perBatch.get(b) || 0}
+              </button>
+            )) : <span className="none">Chưa có batch nào.</span>}
+          </div>
+          {bids.length > 0 && (
+            <>
+              <div className="row">
+                <label className="fld">Gộp vào
+                  <select className="inp" value={effTarget} onChange={e => setMrgTarget(Number(e.target.value))} style={{ minWidth: 200 }} aria-label="Batch đích khi gộp">
+                    <option value={0}>Tạo batch mới</option>
+                    {mrgIds.map(b => <option key={b} value={b}>{batchLabel(b)}</option>)}
+                  </select>
+                </label>
+                {effTarget === 0 && (
+                  <input className="inp" type="text" value={mrgName} onChange={e => setMrgName(e.target.value)} placeholder="Tên batch mới (không bắt buộc)" style={{ minWidth: 220 }} aria-label="Tên batch mới" />
+                )}
+                <label className="fld"><input type="checkbox" checked={mrgDedupe} onChange={e => setMrgDedupe(e.target.checked)} /> Lọc trùng tài khoản</label>
+              </div>
+              <div className="row">
+                <button className="btn" onClick={() => setMrgSel(new Set(mrgIds.length === bids.length ? [] : bids))}>{mrgIds.length === bids.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}</button>
+                <span className="sp" />
+                <button className="btn solid" disabled={mrgIds.length < 2} onClick={doMerge}>
+                  {mrgIds.length >= 2 ? `Gộp ${mrgIds.length} batch (${mrgN} account)` : 'Gộp batch đã chọn'}
+                </button>
+              </div>
+            </>
           )}
         </section>
         <section className="sec"><h2>Cài đặt ghi chú: danh sách lựa chọn</h2>

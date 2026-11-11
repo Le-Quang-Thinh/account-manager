@@ -235,6 +235,44 @@ export function moveBatch(ids: number[], b: number) {
   for (const a of list) if (a.batch !== b) { a.batch = b; n++ }
   return { n, batch: b }
 }
+// Gộp nhiều batch vào một batch đích. Giữ nguyên account (chỉ đổi batch của chúng về đích),
+// thứ tự gốc trong S.accounts được bảo toàn. Batch nguồn trống sau khi gộp sẽ bị gỡ khỏi batchMeta.
+// dedupe = true: bỏ account trùng tên tài khoản (không phân biệt hoa/thường) trong batch đích sau khi gộp.
+// Khi trùng thì GIỮ BẢN NHIỀU THÔNG TIN NHẤT (Đã bán > Special > Farm, rồi ưu tiên bản có ghi chú / thông tin bán)
+// để không mất dấu Special khi hai batch đánh dấu khác nhau. Dữ liệu bình thường vốn đã duy nhất tên tài khoản
+// nên thường không có dòng nào bị bỏ; lọc trùng chỉ có tác dụng với dữ liệu bất thường (file khôi phục cũ, trộn tay).
+// target = 0 hoặc batch không tồn tại thì tạo batch đích mới.
+export function mergeBatches(bs: number[], target: number, dedupe: boolean, name?: string): { sources: number; moved: number; removed: number; target: number | null } {
+  const sources = bs.filter(b => S.batchMeta[b] || S.accounts.some(a => a.batch === b))
+  if (!sources.length) return { sources: 0, moved: 0, removed: 0, target: null }
+  let t = target
+  if (!t || !S.batchMeta[t]) { t = ++S.batchSeq; S.batchMeta[t] = { at: Date.now(), name: (name || '').trim() } }
+  else if (name != null && name.trim()) S.batchMeta[t].name = name.trim()
+  const srcSet = new Set(sources)
+  srcSet.delete(t) // batch đích giữ nguyên, chỉ dồn các batch nguồn vào
+  let moved = 0
+  for (const a of S.accounts) if (srcSet.has(a.batch)) { a.batch = t; moved++ }
+  let removed = 0
+  if (dedupe) {
+    // Điểm ưu tiên: Đã bán > Special > Farm (×4), cộng thêm nếu có ghi chú / thông tin bán.
+    const rank = (a: Account) => (a.status === 'sold' ? 2 : a.status === 'special' ? 1 : 0) * 4
+      + ((a.note || '').trim() ? 2 : 0) + ((a.sale || '').trim() ? 1 : 0)
+    const best = new Map<string, Account>()
+    for (const a of S.accounts) {
+      if (a.batch !== t) continue
+      const k = a.user.toLowerCase()
+      const cur = best.get(k)
+      if (!cur || rank(a) > rank(cur)) best.set(k, a)
+    }
+    const keep = new Set(best.values())
+    S.accounts = S.accounts.filter(a => {
+      if (a.batch !== t || keep.has(a)) return true
+      removed++; return false
+    })
+  }
+  for (const b of srcSet) if (!S.accounts.some(a => a.batch === b)) delete S.batchMeta[b]
+  return { sources: sources.length, moved, removed, target: t }
+}
 // Xoá hẳn các batch: mọi account thuộc batch (ở mọi tab) và thông tin batch. Số batch không dùng lại.
 export function deleteBatches(bs: number[]) {
   const set = new Set(bs)
