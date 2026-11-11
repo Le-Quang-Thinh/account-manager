@@ -2,16 +2,18 @@ import { Activity, useState } from 'react'
 import SplitTab from './SplitTab'
 import GroupTrimTab from './GroupTrimTab'
 import SpecialTab from './SpecialTab'
+import SortMachineTab from './SortMachineTab'
 import { CaseToggle, PageHead, SubTabs } from '../../shared/components/Layout'
 import type { SubTabItem } from '../../shared/components/Layout'
 import { readStored, writeStored } from '../../shared/lib/storage'
 
-type ModeId = 'split' | 'group_trim' | 'special'
+type ModeId = 'split' | 'group_trim' | 'special' | 'sort_machine'
 
 const MODES: (SubTabItem<ModeId> & { hint: string })[] = [
   { id: 'split', label: 'Tách file', hint: 'Chia danh sách thành nhiều file, tải về dạng .zip.' },
   { id: 'group_trim', label: 'Chia nhóm và tỉa', hint: 'Chia thành các lô để copy, rồi tỉa từng lô trong khu vực làm việc.' },
   { id: 'special', label: 'Tách Special', hint: 'Tách dòng theo từ khóa hoặc regex, kết quả được tô sáng.' },
+  { id: 'sort_machine', label: 'Sắp theo máy', hint: 'Gom phần đầu mỗi máy (ưu tiên) và phần còn lại, giữ nguyên thứ tự trong từng máy.' },
 ]
 const IDS = MODES.map(m => m.id)
 const KEY = 'accmgr_split_mode'
@@ -31,6 +33,7 @@ export default function SplitTool() {
       <Activity mode={mode === 'split' ? 'visible' : 'hidden'}><SplitTab caseSensitive={caseSensitive} /></Activity>
       <Activity mode={mode === 'group_trim' ? 'visible' : 'hidden'}><GroupTrimTab caseSensitive={caseSensitive} /></Activity>
       <Activity mode={mode === 'special' ? 'visible' : 'hidden'}><SpecialTab caseSensitive={caseSensitive} /></Activity>
+      <Activity mode={mode === 'sort_machine' ? 'visible' : 'hidden'}><SortMachineTab /></Activity>
     </>
   )
 }

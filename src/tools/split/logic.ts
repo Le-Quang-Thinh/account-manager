@@ -82,6 +82,34 @@ export function highlightSegments(text: string, keyword: string, isRegex: boolea
   }
 }
 
+// ----- Sắp xếp lại theo máy (heads ưu tiên + tails còn lại) -----
+// Danh sách đã xếp theo máy (block liên tục). Chia đều cho `machines` máy,
+// lấy tối đa `headSize` dòng đầu mỗi máy gom vào heads, phần còn lại vào tails.
+// Giữ nguyên thứ tự gốc trong từng máy; block cuối ngắn hơn vẫn chạy đúng.
+export function reorderByMachine(raw: string, machines: number, headSize: number, dropEmpty: boolean) {
+  let lines = splitLines(raw)
+  if (dropEmpty) lines = lines.map(l => l.trim()).filter(l => l !== '')
+  else if (lines.length && lines[lines.length - 1] === '') lines.pop()
+  const total = lines.length
+  const empty = { heads: '', tails: '', sorted: '', total: 0, perMachine: 0, blockCount: 0, headCount: 0, tailCount: 0 }
+  if (!total) return empty
+  const per = Math.max(1, Math.ceil(total / Math.max(1, machines)))
+  const take = Math.max(0, headSize)
+  const heads: string[] = []
+  const tails: string[] = []
+  let blockCount = 0
+  for (let i = 0; i < total; i += per) {
+    const block = lines.slice(i, i + per)
+    blockCount++
+    heads.push(...block.slice(0, take))
+    tails.push(...block.slice(take))
+  }
+  return {
+    heads: toText(heads), tails: toText(tails), sorted: toText([...heads, ...tails]),
+    total, perMachine: per, blockCount, headCount: heads.length, tailCount: tails.length,
+  }
+}
+
 // ----- Tách file (Split) -----
 export type SplitMethod = 'by_files' | 'by_lines'
 export function splitIntoChunks(raw: string, opts: { dedupe: boolean; method: SplitMethod; num: number; multiple: number; caseSensitive: boolean }) {
