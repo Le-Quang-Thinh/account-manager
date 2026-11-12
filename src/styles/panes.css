@@ -31,6 +31,15 @@
 .err{color:var(--danger);font-size:13px}
 .dim{color:var(--mute);font-size:12.5px}
 .mono{font-family:var(--mono);font-size:13px}
+.mcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;padding:10px;max-height:720px;overflow:auto;background:var(--surface)}
+.mcards.tall{max-height:calc(100vh - 220px);min-height:360px}
+.mcards .batch{display:flex;flex-direction:column}
+.mcards .batch .ta-pane{border:0;border-radius:0;min-height:160px}
+.mtx{border-collapse:collapse;font-family:var(--mono);font-size:12.5px}
+.mtx th,.mtx td{border:1px solid var(--line);padding:3px 9px;text-align:center;min-width:48px}
+.mtx thead th,.mtx tbody th{color:var(--mute);font-weight:600;background:var(--raised)}
+.mtx tbody td{color:var(--ink)}
+.mtx tbody tr td:first-of-type,.mtx tbody th{white-space:nowrap}
 .case-toggle{padding:6px 12px;border:1px solid var(--line);border-radius:6px;background:var(--raised);cursor:pointer}
 .file-list{list-style:none;margin:0;padding:0;max-height:520px;overflow:auto}
 .file-list li{display:flex;align-items:center;gap:12px;padding:6px 12px;border-bottom:1px solid var(--line)}

@@ -110,6 +110,30 @@ export function reorderByMachine(raw: string, machines: number, headSize: number
   }
 }
 
+// ----- Xen kẽ theo máy (transpose / round-robin) -----
+// Danh sách đã xếp theo máy (mỗi máy là một block liên tục, ví dụ 50 dòng/máy).
+// Trả về thứ tự xen kẽ: lấy dòng đầu của tất cả các máy trước, rồi dòng 2 của tất cả các máy...
+// Với 1000 acc / 20 máy (50 dòng/máy): 1, 51, 101, ..., 951, 2, 52, 102, ..., 952, ...
+export function interleaveByMachine(raw: string, machines: number, dropEmpty: boolean) {
+  let lines = splitLines(raw)
+  if (dropEmpty) lines = lines.map(l => l.trim()).filter(l => l !== '')
+  else if (lines.length && lines[lines.length - 1] === '') lines.pop()
+  const total = lines.length
+  const empty = { result: '', total: 0, perMachine: 0, blockCount: 0 }
+  if (!total) return empty
+  const count = Math.max(1, machines)
+  const per = Math.max(1, Math.ceil(total / count))
+  const out: string[] = []
+  // row = vị trí trong máy (0..per-1); col = máy (0..count-1)
+  for (let row = 0; row < per; row++) {
+    for (let col = 0; col < count; col++) {
+      const idx = col * per + row
+      if (idx < total) out.push(lines[idx])
+    }
+  }
+  return { result: toText(out), total, perMachine: per, blockCount: Math.ceil(total / per) }
+}
+
 // ----- Tách file (Split) -----
 export type SplitMethod = 'by_files' | 'by_lines'
 export function splitIntoChunks(raw: string, opts: { dedupe: boolean; method: SplitMethod; num: number; multiple: number; caseSensitive: boolean }) {
