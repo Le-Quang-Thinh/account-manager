@@ -155,6 +155,22 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
     commit()
     toast(`Đã chuyển ${n} account sang Đã bán.`)
   }
+  // Kiểm tra account Special trùng tên tài khoản; tick sẵn các bản dư (giữ bản đầu) để xem / xoá
+  const checkDup = () => {
+    const groups = new Map<string, Account[]>()
+    for (const a of S.accounts) {
+      if (a.status !== 'special') continue
+      const k = a.user.toLowerCase(), g = groups.get(k)
+      if (g) g.push(a); else groups.set(k, [a])
+    }
+    const dups = [...groups.values()].filter(g => g.length > 1)
+    if (!dups.length) { toast('Không có account Special nào bị trùng.'); return }
+    const extra = dups.flatMap(g => g.slice(1))
+    setFb('all'); setFn(new Set()); setQ('')
+    setSel(new Set(extra.map(a => a.id)))
+    const names = dups.slice(0, 5).map(g => `${g[0].user} (${g.length})`).join(', ')
+    toast(`Có ${dups.length} account Special bị trùng (${extra.length} bản dư, đã tick sẵn): ${names}${dups.length > 5 ? '…' : ''}`)
+  }
   const pendingSp = locked ? S.accounts.filter(a => farmLock?.has(a.id) && a.status === 'special').length : 0
   const confirmLock = () => {
     const n = pendingSp
@@ -402,6 +418,7 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
               {exportItems().map(([a, l]) => <button key={a} className="menu-i" role="menuitem" onClick={() => exportAct(a)}>{l}</button>)}
             </div>
           </div>
+          {tab === 'special' && <button className="btn" title="Tìm account Special trùng tên tài khoản và tick sẵn các bản dư" onClick={checkDup}>Kiểm tra trùng</button>}
           {canAdd && <button className="btn" aria-expanded={adding} title="Thêm account vào batch (bù batch bị lẻ)" onClick={() => setAdding(v => !v)}>Thêm account</button>}
           {isList && <button className="btn teal" title="Loại Special và Đã bán khỏi Danh sách, chỉ giữ Farm, rồi tải .zip Farm" onClick={doConfirm}>Xác nhận và xuất Farm</button>}
         </div>
