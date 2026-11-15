@@ -332,15 +332,20 @@ export function logToSpecial(text: string, pass: string) {
     col = { user: head.indexOf('username'), name: head.indexOf('pokemon_name'), size: head.indexOf('size') }
     rows.shift()
   } else if (!rows.every(r => r.length > LOG_COLS.size)) return null
-  const lines: string[] = []
+  // Một account xuất hiện nhiều dòng thì gộp ghi chú: "pkm1_pkm2"
+  const byUser = new Map<string, { user: string, notes: string[] }>()
   let skipped = 0
   for (const r of rows) {
     const user = (r[col.user] || '').trim(), name = (r[col.name] || '').trim()
     if (!user) { skipped++; continue }
     const size = col.size >= 0 ? (r[col.size] || '').trim().toUpperCase() : ''
     const note = name + (size === 'XXS' || size === 'XXL' ? '_' + size : '')
-    lines.push(`${user}:${pass}` + (note ? ' # ' + note : ''))
+    const k = user.toLowerCase()
+    let e = byUser.get(k)
+    if (!e) byUser.set(k, e = { user, notes: [] })
+    if (note) e.notes.push(note)
   }
+  const lines = [...byUser.values()].map(e => `${e.user}:${pass}` + (e.notes.length ? ' # ' + e.notes.join('_') : ''))
   return { lines, skipped }
 }
 
