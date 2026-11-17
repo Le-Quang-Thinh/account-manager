@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ChangeEvent, ClipboardEvent, ReactNode } from 'react'
 import {
-  S, save, fresh, normalize, replaceS, isFileStorage, importLines, bulkSpecial, logToSpecial, addTags, removeTag,
+  S, save, fresh, normalize, replaceS, isFileStorage, importLines, bulkSpecial, bulkSell, logToSpecial, addTags, removeTag,
   chunkByBatch, chunkByNote, rawText, toCSV, noteOrder, batchIds, batchLabel, deleteBatches, mergeBatches, toggleHiddenTag,
 } from './store'
 import { stamp, download } from '../../shared/lib/browser'
@@ -16,6 +16,9 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
   const [sp, setSp] = useState('')
   const [spPass, setSpPass] = useState('Gamepika238@') // mật khẩu gắn vào khi dán log từ Google Sheet
   const [spEvent, setSpEvent] = useState('') // event gắn cho cả đợt nhập special (rỗng = special thường)
+  const [sell, setSell] = useState('') // danh sách account cần chuyển Special -> Đã bán
+  const [sellInfo, setSellInfo] = useState('') // thông tin bán gắn cho cả đợt
+  const [sellNote, setSellNote] = useState('') // ghi chú gắn cho cả đợt (để trống = giữ ghi chú cũ)
   const [tagIn, setTagIn] = useState('')
   const [chunk, setChunk] = useState(String(s.chunk))
   const [group, setGroup] = useState(String(s.group))
@@ -46,6 +49,18 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
     if (r.miss.length) msg += ` Bỏ qua ${r.miss.length} dòng trùng account đã bán (để lại trong ô).`
     setSp(r.miss.join('\n'))
     if (r.created) { goTab('special'); setFb(r.batch!) } // mở luôn batch unknown để thấy account vừa tạo
+    toast(msg)
+  }
+  const doSell = () => {
+    if (!sell.trim()) { toast('Chưa dán danh sách.'); return }
+    const r = bulkSell(sell, sellInfo, sellNote)
+    commit()
+    let msg = `Đã chuyển ${r.n} account sang Đã bán`
+      + (sellInfo.trim() ? ` (thông tin bán: ${sellInfo.trim()})` : '')
+      + (sellNote.trim() ? ` · ghi chú: ${sellNote.trim()}` : '') + '.'
+    if (r.miss.length) msg += ` Bỏ qua ${r.miss.length} dòng không bán được (không phải Special / không tìm thấy, để lại trong ô).`
+    setSell(r.miss.join('\n'))
+    if (r.n) goTab('sold')
     toast(msg)
   }
   // Dán log Google Sheet: tự chuẩn hoá thành "username:pass # pokemon_name[_size]" rồi nối vào ô
@@ -176,6 +191,16 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
           </div>
           <textarea className="ta" style={{ minHeight: 110 }} value={sp} onChange={e => setSp(e.target.value)} onPaste={pasteLog} placeholder={'account5:pass5 # skin hiếm\naccount9 # rank cao\n(hoặc dán log từ Google Sheet)'} aria-label="Danh sách special" />
           <div className="row"><button className="btn star" onClick={doBulk}>Chuyển sang Special</button></div>
+        </section>
+        <section className="sec"><h2>Bán hàng loạt (Special → Đã bán)</h2>
+          <p>Dán danh sách account cần bán, mỗi dòng một account (có thể kèm <code>:password</code> hoặc <code># ghi chú riêng</code>). Chỉ account đang ở <b>Special</b> mới được chuyển sang <b>Đã bán</b>. Dòng không tìm thấy, đang Farm, hoặc đã bán rồi sẽ được giữ lại trong ô để bạn kiểm tra.</p>
+          <p>Ô <b>Thông tin bán</b> và <b>Ghi chú</b> bên dưới được gắn cho cả đợt. Ghi chú riêng sau dấu <code>#</code> của từng dòng sẽ được ưu tiên. Để trống ô Ghi chú thì giữ nguyên ghi chú cũ của account.</p>
+          <div className="row">
+            <input className="inp" type="text" value={sellInfo} onChange={e => setSellInfo(e.target.value)} placeholder="Thông tin bán (vd: giá, người mua...)" aria-label="Thông tin bán cho đợt này" style={{ minWidth: 300 }} />
+            <input className="inp" type="text" value={sellNote} onChange={e => setSellNote(e.target.value)} placeholder="Ghi chú (để trống = giữ ghi chú cũ)" aria-label="Ghi chú cho đợt bán này" style={{ minWidth: 260 }} />
+          </div>
+          <textarea className="ta" style={{ minHeight: 110 }} value={sell} onChange={e => setSell(e.target.value)} placeholder={'account5\naccount9 # ghi chú riêng\naccount12:pass12'} aria-label="Danh sách account cần bán" />
+          <div className="row"><button className="btn star" onClick={doSell}>Chuyển sang Đã bán</button></div>
         </section>
         <section className="sec"><h2>Xuất file</h2>
           <p>Farm và Danh sách: .zip tách theo batch, mỗi file đúng số dòng đặt bên dưới (tên dạng <code>batch2-farm-01.txt</code>). Special và Đã bán: .zip tách theo ghi chú, mỗi ghi chú một file, nhóm quá dài sẽ chia thêm -p01, -p02.</p>

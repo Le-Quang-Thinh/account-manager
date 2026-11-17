@@ -390,6 +390,32 @@ export function bulkSpecial(text: string, defaultEvent = '') {
   }
   return { n, created, batch, miss }
 }
+// Dán danh sách để bán hàng loạt: mỗi dòng là tên account (hoặc "account # ghi chú", hoặc "account:password # ghi chú").
+// Chỉ account đang ở Special mới được bán. sale = thông tin bán gắn cho cả đợt; note = ghi chú gắn cho cả đợt
+// (ghi chú riêng sau dấu # của từng dòng được ưu tiên hơn note chung). Nếu note để trống thì giữ nguyên ghi chú cũ.
+// miss: các dòng không bán được (không tìm thấy, đang Farm, hoặc đã bán rồi) được trả lại để giữ trong ô.
+export function bulkSell(text: string, sale = '', note = '') {
+  const idx = new Map<string, Account>()
+  for (const a of S.accounts) idx.set(a.user.toLowerCase(), a)
+  const sl = sale.trim(), nt = note.trim()
+  let n = 0
+  const miss: string[] = []
+  for (let line of text.split(/\r?\n/)) {
+    line = line.trim()
+    if (!line) continue
+    const p = line.indexOf('#')
+    const acc = (p >= 0 ? line.slice(0, p) : line).trim(), lineNote = p >= 0 ? line.slice(p + 1).trim() : ''
+    const u = parseUser(acc), k = u.toLowerCase()
+    if (!u) continue
+    const a = idx.get(k)
+    if (!a || a.status !== 'special') { miss.push(line); continue } // không bán được: để lại trong ô
+    a.prev = 'special'; a.status = 'sold'; a.sale = sl; a.soldAt = Date.now()
+    const noteVal = lineNote || nt
+    if (noteVal) a.note = noteVal
+    n++
+  }
+  return { n, miss }
+}
 function unknownBatch() {
   const b = Object.keys(S.batchMeta).map(Number).find(b => S.batchMeta[b]?.name === UNKNOWN_BATCH)
   if (b) return b
