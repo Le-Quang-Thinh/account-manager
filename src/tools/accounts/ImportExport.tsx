@@ -15,6 +15,7 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
   const [impName, setImpName] = useState('')
   const [sp, setSp] = useState('')
   const [spPass, setSpPass] = useState('Gamepika238@') // mật khẩu gắn vào khi dán log từ Google Sheet
+  const [spEvent, setSpEvent] = useState('') // event gắn cho cả đợt nhập special (rỗng = special thường)
   const [tagIn, setTagIn] = useState('')
   const [chunk, setChunk] = useState(String(s.chunk))
   const [group, setGroup] = useState(String(s.group))
@@ -38,9 +39,9 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
   }
   const doBulk = () => {
     if (!sp.trim()) { toast('Chưa dán danh sách.'); return }
-    const r = bulkSpecial(sp)
+    const r = bulkSpecial(sp, spEvent)
     commit()
-    let msg = `Đã chuyển ${r.n} account sang Special.`
+    let msg = `Đã chuyển ${r.n} account sang Special` + (spEvent.trim() ? ` (event ${spEvent.trim()})` : '') + '.'
     if (r.created) msg += ` Tạo mới ${r.created} account không có trong danh sách vào ${batchLabel(r.batch!)}.`
     if (r.miss.length) msg += ` Bỏ qua ${r.miss.length} dòng trùng account đã bán (để lại trong ô).`
     setSp(r.miss.join('\n'))
@@ -53,7 +54,9 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
     if (!r) return // không phải log, dán bình thường
     e.preventDefault()
     if (r.lines.length) setSp(v => (v.trim() ? v.replace(/\s*$/, '') + '\n' : '') + r.lines.join('\n'))
-    toast(`Đã chuẩn hoá ${r.lines.length} dòng từ log` + (r.skipped ? `, bỏ ${r.skipped} dòng không có username.` : '.'))
+    toast(`Đã chuẩn hoá ${r.lines.length} dòng từ log`
+      + (r.dyn ? `, ${r.dyn} dòng gắn event dynamax (hậu tố @dynamax)` : '')
+      + (r.skipped ? `, bỏ ${r.skipped} dòng không có username.` : '.'))
   }
   const readFiles = (e: ChangeEvent<HTMLInputElement>) => {
     ;[...(e.target.files || [])].forEach(f => {
@@ -164,8 +167,11 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
         </section>
         <section className="sec"><h2>Đánh dấu Special hàng loạt</h2>
           <p>Nếu bạn đã có sẵn danh sách special, dán vào đây, mỗi dòng <code>account:password # ghi chú</code> hoặc chỉ tên account. Phần ghi chú sau dấu # có thể bỏ trống. Tool tự tìm account ở mọi batch; account không có ở batch nào sẽ được tạo mới vào batch <code>unknown</code> và đánh dấu Special luôn.</p>
-          <p>Có thể copy thẳng các dòng log từ Google Sheet (kèm hoặc không kèm dòng header) và dán vào: tool tự đổi thành <code>username:mật khẩu # pokemon_name</code>, thêm <code>_XXS</code> / <code>_XXL</code> nếu size là XXS hoặc XXL. Dòng không có username sẽ bị bỏ qua.</p>
+          <p>Điền ô <b>Event</b> bên dưới (vd <code>dynamax</code>) thì <b>cả đợt</b> special nhập vào đều thuộc event đó; để trống = special thường. Muốn gắn event riêng cho vài dòng thì thêm hậu tố <code>@tên-event</code> ở cuối dòng. Ở tab Special sẽ có hàng lọc theo event, mỗi event vẫn gom nhóm theo tên pokemon.</p>
+          <p>Có thể copy thẳng các dòng log từ Google Sheet (kèm hoặc không kèm dòng header) và dán vào: tool tự đổi thành <code>username:mật khẩu # pokemon_name</code>, thêm <code>_XXS</code> / <code>_XXL</code> nếu size là XXS hoặc XXL. Riêng costume <code>Specialbackground2025Global</code> tự gắn hậu tố <code>@dynamax</code> (vào event dynamax, giữ nguyên tên pokemon). Dòng không có username sẽ bị bỏ qua.</p>
           <div className="row">
+            <input className="inp" type="text" value={spEvent} onChange={e => setSpEvent(e.target.value)} placeholder="Event (vd dynamax, để trống = special thường)" aria-label="Event cho đợt special này" list="sp-events" style={{ minWidth: 300 }} />
+            <datalist id="sp-events"><option value="dynamax" /></datalist>
             <input className="inp" type="text" value={spPass} onChange={e => setSpPass(e.target.value)} placeholder="Mật khẩu khi dán log" aria-label="Mật khẩu gắn vào khi dán log" style={{ minWidth: 230 }} />
           </div>
           <textarea className="ta" style={{ minHeight: 110 }} value={sp} onChange={e => setSp(e.target.value)} onPaste={pasteLog} placeholder={'account5:pass5 # skin hiếm\naccount9 # rank cao\n(hoặc dán log từ Google Sheet)'} aria-label="Danh sách special" />

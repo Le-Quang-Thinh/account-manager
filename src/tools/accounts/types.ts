@@ -11,6 +11,7 @@ export interface Account {
   status: Status
   inList: boolean
   note: string
+  event?: string // event của special (vd "dynamax"); rỗng/thiếu = special thường
   sale: string
   soldAt: number | null
   prev: Status
@@ -52,6 +53,8 @@ export interface Ctx {
   setFs: (s: StatusFilter) => void
   fn: Set<string>
   setFn: (s: Set<string>) => void
+  fe: string | null // lọc theo event (tab Special / Đã bán); null = tất cả, '' = không event
+  setFe: (e: string | null) => void
   visible: Account[]
   ordered: Account[]
   isNoteTab: boolean

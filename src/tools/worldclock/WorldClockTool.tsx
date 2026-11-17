@@ -5,18 +5,19 @@ import type { SubTabItem } from '../../shared/components/Layout'
 import { copyText } from '../../shared/lib/browser'
 import { readStored, writeStored } from '../../shared/lib/storage'
 import {
-  CITIES, FOCUS, LOCAL_TZ, circDist, cityKey, dateText, defaultCoord, diffText, durText, loadCoords,
+  CITIES, CLUSTER, FOCUS, LOCAL_TZ, circDist, cityKey, dateText, defaultCoord, diffText, durText, inWindow, loadCoords,
   offsetMin, parseCoord, saveCoords, timeText, utcText, zoned,
 } from './logic'
 import type { City } from './logic'
 
-type ModeId = 'clock' | 'find'
+type ModeId = 'clock' | 'find' | 'cluster'
 type Toast = (m: string) => void
 type SetCoord = (c: City, v: string | null) => void
 
 const MODES: (SubTabItem<ModeId> & { hint: string })[] = [
   { id: 'clock', label: 'Đồng hồ', hint: 'Giờ hiện tại ở 6 thành phố đang theo dõi, đã tính giờ mùa hè.' },
   { id: 'find', label: 'Tìm theo giờ', hint: 'Chọn một giờ, xem nơi nào đang ở giờ đó kèm tọa độ.' },
+  { id: 'cluster', label: 'Cụm 10–17h', hint: 'Cụm các nước quét đủ múi giờ; tô sáng nơi đang trong khung 10:00–17:00. ★ = nước ưu tiên.' },
 ]
 const IDS = MODES.map(m => m.id)
 const KEY = 'accmgr_wc_mode'
@@ -185,6 +186,56 @@ function FindTab({ now, coordOf, setCoord, toast }: { now: Date; coordOf: (c: Ci
   )
 }
 
+function ClusterTab({ now, coordOf, setCoord, toast }: { now: Date; coordOf: (c: City) => string; setCoord: SetCoord; toast: Toast }) {
+  const [onlyIn, setOnlyIn] = useState(false)
+  const localOff = offsetMin(LOCAL_TZ, now)
+  const rows = CLUSTER.map((c, i) => {
+    const z = zoned(c.tz, now)
+    return { c, i, z, off: offsetMin(c.tz, now), inw: inWindow(z.h) }
+  })
+  const nIn = rows.filter(r => r.inw).length
+  // đang trong khung lên trước, rồi nước ưu tiên, còn lại giữ đúng thứ tự danh sách
+  const shown = (onlyIn ? rows.filter(r => r.inw) : rows)
+    .slice().sort((a, b) => (+b.inw - +a.inw) || (+!!b.c.pri - +!!a.c.pri) || (a.i - b.i))
+
+  return (
+    <>
+      <div className="wc-find">
+        <label className="fld"><input type="checkbox" checked={onlyIn} onChange={e => setOnlyIn(e.target.checked)} /> Chỉ nơi đang 10–17h</label>
+        <span className="dim">★ = nước ưu tiên · khung 10:00–17:00 giờ địa phương</span>
+      </div>
+      <section className="pane">
+        <div className="pane-h">
+          <h3>Cụm 10h–17h <small>{nIn}/{CLUSTER.length} nơi đang trong khung</small></h3>
+        </div>
+        <div className="en-pad">
+          <table className="nt-table wc-table">
+            <thead>
+              <tr><th className="c-t">Thành phố</th><th className="c-h">Giờ</th><th className="c-u">Múi giờ</th><th>Coord (lat, lng)</th></tr>
+            </thead>
+            <tbody>
+              {shown.map(r => (
+                <tr key={cityKey(r.c)} className={r.inw ? 'focus' : ''}>
+                  <td className="c-t" title={`${r.c.name}, ${r.c.country}`}>
+                    {r.c.pri ? <span title="Ưu tiên">★ </span> : null}
+                    {r.c.name} <span className="dim">{r.c.country}</span>
+                    {r.inw ? <span className="badge tone-amber"> 10–17h</span> : null}
+                  </td>
+                  <td className="c-h mono">{timeText(r.z)} <span className="dim">{r.z.wd}</span></td>
+                  <td className="c-u dim">{utcText(r.off)} · {diffText(r.off - localOff)}</td>
+                  <td>{r.c.todo
+                    ? <span className="dim">đang tìm địa điểm…</span>
+                    : <CoordField key={coordOf(r.c)} city={r.c} coord={coordOf(r.c)} setCoord={setCoord} toast={toast} />}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </>
+  )
+}
+
 export default function WorldClockTool({ toast }: { toast: Toast }) {
   const [mode, setMode] = useState<ModeId>(() => readStored(KEY, IDS, 'clock'))
   const [coords, setCoords] = useState(loadCoords)
@@ -209,6 +260,7 @@ export default function WorldClockTool({ toast }: { toast: Toast }) {
       <SubTabs items={MODES} value={mode} onChange={pick} label="Chế độ giờ thế giới" />
       <Activity mode={mode === 'clock' ? 'visible' : 'hidden'}><ClockTab now={now} coordOf={coordOf} setCoord={setCoord} toast={toast} /></Activity>
       <Activity mode={mode === 'find' ? 'visible' : 'hidden'}><FindTab now={now} coordOf={coordOf} setCoord={setCoord} toast={toast} /></Activity>
+      <Activity mode={mode === 'cluster' ? 'visible' : 'hidden'}><ClusterTab now={now} coordOf={coordOf} setCoord={setCoord} toast={toast} /></Activity>
     </>
   )
 }

@@ -70,7 +70,7 @@ type TrayBlock = NoteBlock | GroupBlock
 type Block = TrayBlock | HeadBlock
 
 export default function ListPage({ ctx }: { ctx: Ctx }) {
-  const { tab, goTab, sel, setSel, limit, setLimit, q, setQ, fb, setFb, fs, setFs, fn, setFn, visible, ordered, isNoteTab, farmLock, setFarmLock, commit, toast } = ctx
+  const { tab, goTab, sel, setSel, limit, setLimit, q, setQ, fb, setFb, fs, setFs, fn, setFn, fe, setFe, visible, ordered, isNoteTab, farmLock, setFarmLock, commit, toast } = ctx
   const isList = tab === 'list', isSold = tab === 'sold'
   const locked = tab === 'farm' && !!farmLock
   const showSt = isList || locked
@@ -184,7 +184,10 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
   const scope = (kind: string) => S.accounts.filter(a => {
     if (kind === 'list') { if (a.inList === false) return false; if (fs !== 'all' && a.status !== fs) return false }
     else if (a.status !== kind) return false
-    if (fn.size && (kind === 'special' || kind === 'sold') && !fn.has((a.note || '').trim())) return false
+    if ((kind === 'special' || kind === 'sold')) {
+      if (fn.size && !fn.has((a.note || '').trim())) return false
+      if (fe !== null && (a.event || '') !== fe) return false
+    }
     return fb === 'all' || a.batch === fb
   })
   const exportAct = (act: string) => {
@@ -205,9 +208,20 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
     }
     map[act]()
   }
-  // các ghi chú đang có trong tab (theo batch đang lọc), kèm số account
+  // các event đang có trong tab (theo batch đang lọc), kèm số account; '' = không event
+  const eventChips = isNoteTab
+    ? (() => {
+        const m = new Map<string, number>()
+        S.accounts.filter(a => a.status === tab && (fb === 'all' || a.batch === fb))
+          .forEach(a => { const e = a.event || ''; m.set(e, (m.get(e) || 0) + 1) })
+        return [...m.entries()].sort((x, y) => ((x[0] === '' ? 1 : 0) - (y[0] === '' ? 1 : 0)) || x[0].localeCompare(y[0], 'vi'))
+      })()
+    : []
+  const hasEvents = eventChips.some(([e]) => e !== '')
+  const pickEvent = (e: string | null) => { setFe(e); setFn(new Set()); setLimit(PAGE) }
+  // các ghi chú đang có trong tab (theo batch + event đang lọc), kèm số account
   const noteChips = isNoteTab
-    ? noteGroups(S.accounts.filter(a => a.status === tab && (fb === 'all' || a.batch === fb))).map(g => ({ note: g.note, n: g.items.length }))
+    ? noteGroups(S.accounts.filter(a => a.status === tab && (fb === 'all' || a.batch === fb) && (fe === null || (a.event || '') === fe))).map(g => ({ note: g.note, n: g.items.length }))
     : []
   const toggleNote = (note: string) => {
     const n = new Set(fn)
@@ -411,6 +425,17 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
           onDone={(b, msg) => { toast(msg); if (b) { commit(); setAdding(false) } }} />
       )}
       <FloatTags tags={pickTags()}count={sel.size} onTag={bulk.tag} onCreate={createTag} onClear={clear} />
+      {isNoteTab && hasEvents && (
+        <div className="notefilter" role="group" aria-label="Lọc theo event">
+          <span className="hint-inline">Event (cũng áp dụng khi xuất file):</span>
+          <button className={'chip' + (fe === null ? ' on' : '')} aria-pressed={fe === null} onClick={() => pickEvent(null)}>Tất cả</button>
+          {eventChips.map(([e, n]) => (
+            <button key={e || '__none'} className={'chip' + (fe === e ? ' on' : '')} aria-pressed={fe === e} onClick={() => pickEvent(fe === e ? null : e)}>
+              {e || 'Không event'} ({n})
+            </button>
+          ))}
+        </div>
+      )}
       {isNoteTab && noteChips.length > 0 && (
         <div className="notefilter" role="group" aria-label="Lọc theo ghi chú">
           <span className="hint-inline">Lọc ghi chú (cũng áp dụng khi xuất file):</span>

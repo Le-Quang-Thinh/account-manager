@@ -1,4 +1,4 @@
-export interface City { name: string; country: string; tz: string; lat: number; lng: number }
+export interface City { name: string; country: string; tz: string; lat: number; lng: number; pri?: boolean; todo?: boolean }
 
 // 6 thành phố theo dõi chính
 export const FOCUS: City[] = [
@@ -88,6 +88,39 @@ export const CITIES: City[] = [
   { name: "Nuku'alofa", country: 'Tonga', tz: 'Pacific/Tongatapu', lat: -21.1394, lng: -175.2049 },
   { name: 'Kiritimati', country: 'Kiribati', tz: 'Pacific/Kiritimati', lat: 1.8721, lng: -157.4278 },
 ]
+
+// Cụm "10h–17h": quét một vòng các múi giờ (UTC+14 → UTC−11) để lúc nào cũng có vài nơi đang trong khung 10:00–17:00.
+// Thứ tự giữ đúng như danh sách ưu tiên; pri = nước ưu tiên (★); todo = vị trí "đang tìm" (chưa chốt địa điểm).
+export const CLUSTER: City[] = [
+  { name: 'Kiritimati', country: 'Kiribati', tz: 'Pacific/Kiritimati', lat: 1.8721, lng: -157.4278 },
+  { name: 'Apia', country: 'Samoa', tz: 'Pacific/Apia', lat: -13.8333, lng: -171.7667 },
+  { name: 'Auckland', country: 'New Zealand', tz: 'Pacific/Auckland', lat: -36.8485, lng: 174.7633 },
+  { name: 'Nouméa', country: 'New Caledonia', tz: 'Pacific/Noumea', lat: -22.2758, lng: 166.458 },
+  { name: 'Sydney', country: 'Úc', tz: 'Australia/Sydney', lat: -33.8688, lng: 151.2093 },
+  { name: 'Tokyo', country: 'Nhật Bản', tz: 'Asia/Tokyo', lat: 35.6762, lng: 139.6503, pri: true },
+  { name: 'Đài Bắc', country: 'Đài Loan', tz: 'Asia/Taipei', lat: 25.033, lng: 121.5654, pri: true },
+  { name: 'Tao Đàn', country: 'Việt Nam', tz: 'Asia/Ho_Chi_Minh', lat: 10.7757, lng: 106.6922 },
+  { name: 'Chittagong', country: 'Bangladesh', tz: 'Asia/Dhaka', lat: 22.3569, lng: 91.7832 },
+  { name: 'Mumbai', country: 'Ấn Độ', tz: 'Asia/Kolkata', lat: 19.076, lng: 72.8777 },
+  { name: 'Dubai', country: 'UAE', tz: 'Asia/Dubai', lat: 25.2048, lng: 55.2708, pri: true },
+  { name: 'Izmir', country: 'Thổ Nhĩ Kỳ', tz: 'Europe/Istanbul', lat: 38.4237, lng: 27.1428 },
+  { name: 'Zaragoza', country: 'Tây Ban Nha', tz: 'Europe/Madrid', lat: 41.6488, lng: -0.8891 },
+  { name: 'London', country: 'Anh', tz: 'Europe/London', lat: 51.5074, lng: -0.1278 },
+  { name: 'Reykjavík', country: 'Iceland', tz: 'Atlantic/Reykjavik', lat: 64.1466, lng: -21.9426 },
+  { name: 'Praia', country: 'Cape Verde', tz: 'Atlantic/Cape_Verde', lat: 14.933, lng: -23.5133 },
+  { name: 'Đang tìm', country: 'UTC−2', tz: 'America/Noronha', lat: -3.8547, lng: -32.4245, todo: true },
+  { name: 'São Paulo', country: 'Brazil', tz: 'America/Sao_Paulo', lat: -23.5505, lng: -46.6333 },
+  { name: 'New York', country: 'Mỹ', tz: 'America/New_York', lat: 40.7128, lng: -74.006, pri: true },
+  { name: 'Guayaquil', country: 'Ecuador', tz: 'America/Guayaquil', lat: -2.1894, lng: -79.8891 },
+  { name: 'San José', country: 'Costa Rica', tz: 'America/Costa_Rica', lat: 9.9281, lng: -84.0907 },
+  { name: 'San Francisco', country: 'Mỹ', tz: 'America/Los_Angeles', lat: 37.7749, lng: -122.4194 },
+  { name: 'Đang tìm', country: 'UTC−9', tz: 'America/Anchorage', lat: 61.2181, lng: -149.9003, todo: true },
+  { name: 'Honolulu', country: 'Mỹ (Hawaii)', tz: 'Pacific/Honolulu', lat: 21.3069, lng: -157.8583 },
+  { name: 'Mexico City', country: 'Mexico', tz: 'America/Mexico_City', lat: 19.4326, lng: -99.1332 },
+  { name: 'Pago Pago', country: 'Samoa thuộc Mỹ', tz: 'Pacific/Pago_Pago', lat: -14.2756, lng: -170.702 },
+]
+// Khung giờ "làm việc": 10:00–17:00 (tới 16:59). Trả true nếu giờ địa phương đang trong khung.
+export const inWindow = (h: number) => h >= 10 && h < 17
 
 export const LOCAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone
 

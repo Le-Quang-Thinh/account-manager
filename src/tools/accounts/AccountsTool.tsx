@@ -16,6 +16,7 @@ export default function AccountsTool({ toast }: { toast: (m: string) => void }) 
   const [fb, setFb] = useState<BatchFilter>('all') // lọc batch
   const [fs, setFs] = useState<StatusFilter>('all') // lọc trạng thái (tab Danh sách)
   const [fn, setFn] = useState<Set<string>>(() => new Set()) // lọc ghi chú (tab Special / Đã bán), rỗng = tất cả
+  const [fe, setFe] = useState<string | null>(null) // lọc event (tab Special / Đã bán); null = tất cả
 
   // dữ liệu nằm trong S (store.ts, thay đổi trực tiếp); commit = lưu + vẽ lại
   const commit = useCallback(() => { save(); bump() }, [])
@@ -37,6 +38,7 @@ export default function AccountsTool({ toast }: { toast: (m: string) => void }) 
   const visible = S.accounts.filter(a =>
     inScope(a) && (fb === 'all' || a.batch === fb) &&
     (!isNoteTab || fn.size === 0 || fn.has((a.note || '').trim())) &&
+    (!isNoteTab || fe === null || (a.event || '') === fe) &&
     (!s || a.raw.toLowerCase().includes(s) || (a.note || '').toLowerCase().includes(s)))
     .sort((x, y) => x.batch - y.batch)
   const ordered = isNoteTab ? noteOrder(visible) : visible
@@ -49,9 +51,9 @@ export default function AccountsTool({ toast }: { toast: (m: string) => void }) 
     sel.forEach(id => { if (visIds.has(id)) n.add(id); else changed = true })
     return changed ? n : sel
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sel, tab, q, fb, fs, fn, S.accounts.length, visible.length])
+  }, [sel, tab, q, fb, fs, fn, fe, S.accounts.length, visible.length])
 
-  const goTab = (t: Tab) => { if (t === 'farm' && tab !== 'farm') setFarmLock(snapFarm()); setTab(t); setLimit(PAGE); setSel(new Set()); setQ(''); setFn(new Set()); window.scrollTo(0, 0) }
+  const goTab = (t: Tab) => { if (t === 'farm' && tab !== 'farm') setFarmLock(snapFarm()); setTab(t); setLimit(PAGE); setSel(new Set()); setQ(''); setFn(new Set()); setFe(null); window.scrollTo(0, 0) }
 
   const counts = { list: 0, farm: 0, special: 0, sold: 0 }
   const perBatch = new Map<number, number>() // số account từng batch trong phạm vi tab hiện tại (một lượt duyệt)
@@ -64,7 +66,7 @@ export default function AccountsTool({ toast }: { toast: (m: string) => void }) 
   const batchCount = (b: number) => perBatch.get(b) || 0
 
   const ctx: Ctx = {
-    tab, goTab, sel: effSel, setSel, limit, setLimit, q, setQ, fb, setFb, fs, setFs, fn, setFn,
+    tab, goTab, sel: effSel, setSel, limit, setLimit, q, setQ, fb, setFb, fs, setFs, fn, setFn, fe, setFe,
     visible, ordered, isNoteTab, farmLock, setFarmLock, commit, toast,
   }
 

@@ -323,6 +323,12 @@ export function setNote(ids: number[], note?: string) {
 // Chuẩn hoá log copy từ Google Sheet (cột cách nhau bằng tab) thành "username:pass # pokemon_name[_size]".
 // Size chỉ gắn khi là XXS/XXL. Dòng không có username bị bỏ qua. Trả null nếu text không phải dạng log.
 const LOG_COLS = { user: 3, name: 7, size: 25 } // vị trí cột khi copy không kèm dòng header
+// Costume "Specialbackground2025Global" (vd. "Lc Specialbackground2025Global Gofest Dd001") thuộc event dynamax:
+// gắn hậu tố "@dynamax" vào dòng, tên pokemon vẫn nằm ở ghi chú để gom nhóm trong tab Special.
+const DYNAMAX_MARK = /specialbackground2025global/i
+export const DYNAMAX_EVENT = 'dynamax'
+// Hậu tố "@event" ở cuối dòng để xếp account vào một event (vd "user:pass # Pidove @dynamax").
+const EVENT_SUFFIX = /\s+@([\w-]+)\s*$/
 export function logToSpecial(text: string, pass: string) {
   const rows = text.split(/\r?\n/).filter(l => l.trim()).map(l => l.split('\t'))
   if (!rows.length) return null
@@ -333,38 +339,45 @@ export function logToSpecial(text: string, pass: string) {
     rows.shift()
   } else if (!rows.every(r => r.length > LOG_COLS.size)) return null
   const lines: string[] = []
-  let skipped = 0
+  let skipped = 0, dyn = 0
   for (const r of rows) {
     const user = (r[col.user] || '').trim(), name = (r[col.name] || '').trim()
     if (!user) { skipped++; continue }
     const size = col.size >= 0 ? (r[col.size] || '').trim().toUpperCase() : ''
     const note = name + (size === 'XXS' || size === 'XXL' ? '_' + size : '')
-    lines.push(`${user}:${pass}` + (note ? ' # ' + note : ''))
+    const isDyn = r.some(c => DYNAMAX_MARK.test(c))
+    if (isDyn) dyn++
+    lines.push(`${user}:${pass}` + (note ? ' # ' + note : '') + (isDyn ? ' @' + DYNAMAX_EVENT : ''))
   }
-  return { lines, skipped }
+  return { lines, skipped, dyn }
 }
 
 // Dán danh sách special: mỗi dòng "account:password # ghi chú" (hoặc chỉ tên tài khoản).
 // Account không có ở batch nào thì tạo mới vào batch "unknown" (dùng lại nếu đã có) ở trạng thái Special.
 // miss: chỉ còn các dòng trùng account đã bán (không đụng tới).
 export const UNKNOWN_BATCH = 'unknown'
-export function bulkSpecial(text: string) {
+// defaultEvent: event gắn cho mọi dòng không có hậu tố "@event" riêng. Rỗng = special thường.
+export function bulkSpecial(text: string, defaultEvent = '') {
   const idx = new Map<string, Account>()
   for (const a of S.accounts) idx.set(a.user.toLowerCase(), a)
+  const defEv = defaultEvent.trim()
   let n = 0, created = 0, batch: number | null = null
   const miss: string[] = []
   for (let line of text.split(/\r?\n/)) {
     line = line.trim()
     if (!line) continue
+    const em = line.match(EVENT_SUFFIX) // tách hậu tố "@event" (nếu có)
+    const event = (em ? em[1] : defEv).trim()
+    if (em) line = line.slice(0, em.index).trimEnd()
     const p = line.indexOf('#')
     const acc = (p >= 0 ? line.slice(0, p) : line).trim(), note = p >= 0 ? line.slice(p + 1).trim() : ''
     const u = parseUser(acc), k = u.toLowerCase()
     if (!u) continue
     const a = idx.get(k)
     if (a?.status === 'sold') { miss.push(line); continue }
-    if (a) { a.status = 'special'; if (note) a.note = note; n++; continue }
+    if (a) { a.status = 'special'; if (note) a.note = note; a.event = event; n++; continue }
     if (batch == null) batch = unknownBatch()
-    const x: Account = { id: S.seq++, raw: acc, user: u, batch, status: 'special', inList: true, note, sale: '', soldAt: null, prev: 'special', addedAt: Date.now() }
+    const x: Account = { id: S.seq++, raw: acc, user: u, batch, status: 'special', inList: true, note, event, sale: '', soldAt: null, prev: 'special', addedAt: Date.now() }
     S.accounts.push(x)
     idx.set(k, x)
     created++
@@ -446,8 +459,8 @@ export function fmtDate(t: number | null) {
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 export function toCSV(list: Account[]) {
-  const head = ['STT', 'Batch', 'Tài khoản (nguyên dòng)', 'Trạng thái', 'Ghi chú / Special', 'Thông tin bán', 'Ngày bán']
-  const rows = list.map((a, i) => [i + 1, batchLabel(a.batch), a.raw, STL[a.status], a.note, a.sale, fmtDate(a.soldAt)])
+  const head = ['STT', 'Batch', 'Tài khoản (nguyên dòng)', 'Trạng thái', 'Event', 'Ghi chú / Special', 'Thông tin bán', 'Ngày bán']
+  const rows = list.map((a, i) => [i + 1, batchLabel(a.batch), a.raw, STL[a.status], a.event || '', a.note, a.sale, fmtDate(a.soldAt)])
   return '﻿' + [head, ...rows].map(r => r.map(csvCell).join(',')).join('\r\n')
 }
 // Gắn ghi chú (tag): account Farm thì chuyển sang Special kèm ghi chú, còn lại chỉ đổi ghi chú
