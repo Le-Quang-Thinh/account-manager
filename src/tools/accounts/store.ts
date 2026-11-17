@@ -338,17 +338,23 @@ export function logToSpecial(text: string, pass: string) {
     col = { user: head.indexOf('username'), name: head.indexOf('pokemon_name'), size: head.indexOf('size') }
     rows.shift()
   } else if (!rows.every(r => r.length > LOG_COLS.size)) return null
-  const lines: string[] = []
-  let skipped = 0, dyn = 0
+  // Một account xuất hiện nhiều dòng thì gộp ghi chú: "pkm1_pkm2". Dòng có costume dynamax gắn hậu tố @dynamax.
+  const byUser = new Map<string, { user: string, notes: string[], dyn: boolean }>()
+  let skipped = 0
   for (const r of rows) {
     const user = (r[col.user] || '').trim(), name = (r[col.name] || '').trim()
     if (!user) { skipped++; continue }
     const size = col.size >= 0 ? (r[col.size] || '').trim().toUpperCase() : ''
     const note = name + (size === 'XXS' || size === 'XXL' ? '_' + size : '')
-    const isDyn = r.some(c => DYNAMAX_MARK.test(c))
-    if (isDyn) dyn++
-    lines.push(`${user}:${pass}` + (note ? ' # ' + note : '') + (isDyn ? ' @' + DYNAMAX_EVENT : ''))
+    const k = user.toLowerCase()
+    let e = byUser.get(k)
+    if (!e) byUser.set(k, e = { user, notes: [], dyn: false })
+    if (note) e.notes.push(note)
+    if (r.some(c => DYNAMAX_MARK.test(c))) e.dyn = true
   }
+  const lines = [...byUser.values()].map(e =>
+    `${e.user}:${pass}` + (e.notes.length ? ' # ' + e.notes.join('_') : '') + (e.dyn ? ' @' + DYNAMAX_EVENT : ''))
+  const dyn = [...byUser.values()].filter(e => e.dyn).length
   return { lines, skipped, dyn }
 }
 
