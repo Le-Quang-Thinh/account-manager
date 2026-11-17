@@ -362,7 +362,8 @@ export function logToSpecial(text: string, pass: string) {
 // Account không có ở batch nào thì tạo mới vào batch "unknown" (dùng lại nếu đã có) ở trạng thái Special.
 // miss: chỉ còn các dòng trùng account đã bán (không đụng tới).
 export const UNKNOWN_BATCH = 'unknown'
-// defaultEvent: event gắn cho mọi dòng không có hậu tố "@event" riêng. Rỗng = special thường.
+// defaultEvent: event gắn cho mọi dòng không có hậu tố "@event" riêng. Rỗng = không đổi event của account cũ
+// (account mới tạo sẽ là special thường). Chỉ ghi đè event khi thực sự có event mới -> không xoá nhầm event đã gắn trước đó.
 export function bulkSpecial(text: string, defaultEvent = '') {
   const idx = new Map<string, Account>()
   for (const a of S.accounts) idx.set(a.user.toLowerCase(), a)
@@ -381,7 +382,7 @@ export function bulkSpecial(text: string, defaultEvent = '') {
     if (!u) continue
     const a = idx.get(k)
     if (a?.status === 'sold') { miss.push(line); continue }
-    if (a) { a.status = 'special'; if (note) a.note = note; a.event = event; n++; continue }
+    if (a) { a.status = 'special'; if (note) a.note = note; if (event) a.event = event; n++; continue }
     if (batch == null) batch = unknownBatch()
     const x: Account = { id: S.seq++, raw: acc, user: u, batch, status: 'special', inList: true, note, event, sale: '', soldAt: null, prev: 'special', addedAt: Date.now() }
     S.accounts.push(x)
