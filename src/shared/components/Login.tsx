@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { login } from '../lib/auth'
 import type { User } from '../lib/auth'
 
-export default function Login({ onDone }: { onDone: (u: User) => void }) {
+export default function Login({ onDone, onGuest }: { onDone: (u: User) => void; onGuest?: () => void }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [err, setErr] = useState('')
@@ -22,7 +22,10 @@ export default function Login({ onDone }: { onDone: (u: User) => void }) {
         <input className="fld" placeholder="Tên đăng nhập" autoComplete="username" autoFocus value={username} onChange={e => setUsername(e.target.value)} />
         <input className="fld" type="password" placeholder="Mật khẩu" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} />
         {err && <p role="alert" style={{ margin: 0, color: 'var(--red, #c0392b)' }}>{err}</p>}
-        <button className="btn" type="submit" disabled={busy || !username || !password}>{busy ? 'Đang đăng nhập…' : 'Đăng nhập'}</button>
+        <button className="btn solid" type="submit" disabled={busy || !username || !password}>{busy ? 'Đang đăng nhập…' : 'Đăng nhập'}</button>
+        {onGuest && (
+          <button className="btn ghost" type="button" onClick={onGuest} disabled={busy}>Dùng không cần đăng nhập</button>
+        )}
       </form>
     </main>
   )

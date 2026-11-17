@@ -56,6 +56,8 @@
 .hl-front{position:relative;flex:1;min-height:240px;resize:vertical;background:transparent}
 .modal-bg{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.5);display:grid;place-items:center;padding:16px}
 .modal{width:min(720px,100%);max-height:90vh;display:flex;flex-direction:column;background:var(--raised);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.dedupe-modal{width:min(1180px,100%)}
+.dedupe-modal-body{overflow:auto;padding:12px;min-height:0}
 @media (max-width:1100px){
   .grid.three,.grid.split{grid-template-columns:minmax(0,1fr)}
 }

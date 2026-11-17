@@ -1,6 +1,8 @@
 import { Activity, Suspense, lazy, useCallback, useRef, useState, useSyncExternalStore } from 'react'
 import { readStored, writeStored } from './shared/lib/storage'
 import { isSyncing, storeVersion, subscribeStore } from './tools/accounts/store'
+import { DedupeModal } from './tools/dedupe/DedupeModal'
+import { Icon } from './shared/components/Icon'
 
 // Mỗi nhóm công cụ tách thành một chunk riêng, chỉ tải khi mở lần đầu
 const AccountsTool = lazy(() => import('./tools/accounts/AccountsTool'))
@@ -24,7 +26,6 @@ const TOOLS: { id: ToolId; label: string }[] = [
   { id: 'split', label: 'Chia và tách' },
   { id: 'transform', label: 'Biến đổi' },
 ]
-const TOOL_IDS = TOOLS.map(t => t.id)
 const TOOL_KEY = 'accmgr_tool'
 
 function Body({ id, toast, userKey, dataVer }: { id: ToolId; toast: (m: string) => void; userKey: string; dataVer: number }) {
@@ -40,11 +41,17 @@ function Body({ id, toast, userKey, dataVer }: { id: ToolId; toast: (m: string) 
   }
 }
 
-export default function App({ username, userKey, onLogout }: { username?: string; userKey: string; onLogout?: () => void }) {
-  const [tool, setTool] = useState<ToolId>(() => readStored(TOOL_KEY, TOOL_IDS, 'accounts'))
+// Chế độ khách (chưa đăng nhập): ẩn 2 tab cần server theo user
+const GUEST_HIDDEN: ToolId[] = ['accounts', 'greenraid']
+
+export default function App({ username, userKey, onLogout, guest }: { username?: string; userKey: string; onLogout?: () => void; guest?: boolean }) {
+  const tools = guest ? TOOLS.filter(t => !GUEST_HIDDEN.includes(t.id)) : TOOLS
+  const toolIds = tools.map(t => t.id)
+  const [tool, setTool] = useState<ToolId>(() => readStored(TOOL_KEY, toolIds, toolIds[0]))
   // nhóm đã mở: giữ nguyên (ẩn) để không mất dữ liệu khi chuyển tab, nhóm chưa mở thì chưa tải
   const [opened, setOpened] = useState<ToolId[]>(() => [tool])
   const [toastMsg, setToastMsg] = useState('')
+  const [dedupeOpen, setDedupeOpen] = useState(false) // "Lọc trùng" dạng cửa sổ, mở được ở mọi tab
   const syncing = useSyncExternalStore(subscribeStore, isSyncing)
   const dataVer = useSyncExternalStore(subscribeStore, storeVersion) // đổi khi dữ liệu bị thay bằng bản từ server -> dựng lại tool Accounts
   const toastTimer = useRef<number | undefined>(undefined)
@@ -75,16 +82,19 @@ export default function App({ username, userKey, onLogout }: { username?: string
             <span>Quản lý account</span>
           </div>
           <nav className="tool-tabs" role="tablist" aria-label="Nhóm công cụ">
-            {TOOLS.map(t => (
+            {tools.map(t => (
               <button key={t.id} type="button" role="tab" aria-selected={tool === t.id} className={tool === t.id ? 'on' : ''} onClick={() => pickTool(t.id)}>{t.label}</button>
             ))}
           </nav>
-          {onLogout && (
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flex: 'none' }}>
-              <span style={{ color: 'var(--mute)', fontSize: 14 }}>{username}</span>
-              <button type="button" className="btn" onClick={onLogout}>Đăng xuất</button>
-            </div>
-          )}
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flex: 'none' }}>
+            <button type="button" className="btn icon-btn" onClick={() => setDedupeOpen(true)} title="Lọc trùng (mở ở mọi tab)"><Icon name="copy" size={15} />Lọc trùng</button>
+            {onLogout && (
+              <>
+                <span style={{ color: 'var(--mute)', fontSize: 14 }}>{guest ? 'Khách' : username}</span>
+                <button type="button" className="btn" onClick={onLogout}>{guest ? 'Đăng nhập' : 'Đăng xuất'}</button>
+              </>
+            )}
+          </div>
         </div>
       </header>
       <main className="main" inert={syncing} aria-busy={syncing}>
@@ -98,6 +108,7 @@ export default function App({ username, userKey, onLogout }: { username?: string
         ))}
       </main>
       <div id="toast" className={toastMsg ? 'on' : ''} role="status" aria-live="polite">{toastMsg}</div>
+      <DedupeModal open={dedupeOpen} onClose={() => setDedupeOpen(false)} />
     </>
   )
 }
