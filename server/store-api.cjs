@@ -25,16 +25,16 @@ async function writeStore(userId, j) {
     await lockUser(c, userId)
     // Chỉ ghi phần thay đổi (upsert, bỏ qua dòng giống hệt) rồi xoá dòng không còn: tránh xoá và ghi lại toàn bộ mỗi lần lưu
     const json = JSON.stringify(accounts)
-    await c.query(`INSERT INTO accounts (user_id, id, raw, acc_user, batch, status, in_list, note, sale, sold_at, prev, added_at)
+    await c.query(`INSERT INTO accounts (user_id, id, raw, acc_user, batch, status, in_list, note, event, sale, sold_at, prev, added_at)
       SELECT $1, a.id, COALESCE(a.raw, ''), COALESCE(a."user", ''), COALESCE(a.batch, 0), COALESCE(NULLIF(a.status, ''), 'farm'),
-        COALESCE(a."inList", true), COALESCE(a.note, ''), COALESCE(a.sale, ''), a."soldAt", COALESCE(NULLIF(a.prev, ''), 'special'), COALESCE(a."addedAt", 0)
+        COALESCE(a."inList", true), COALESCE(a.note, ''), COALESCE(a.event, ''), COALESCE(a.sale, ''), a."soldAt", COALESCE(NULLIF(a.prev, ''), 'special'), COALESCE(a."addedAt", 0)
       FROM jsonb_to_recordset($2::jsonb) AS a(id bigint, raw text, "user" text, batch int, status text, "inList" boolean,
-        note text, sale text, "soldAt" bigint, prev text, "addedAt" bigint)
+        note text, event text, sale text, "soldAt" bigint, prev text, "addedAt" bigint)
       ON CONFLICT (user_id, id) DO UPDATE SET raw = EXCLUDED.raw, acc_user = EXCLUDED.acc_user, batch = EXCLUDED.batch,
-        status = EXCLUDED.status, in_list = EXCLUDED.in_list, note = EXCLUDED.note, sale = EXCLUDED.sale,
+        status = EXCLUDED.status, in_list = EXCLUDED.in_list, note = EXCLUDED.note, event = EXCLUDED.event, sale = EXCLUDED.sale,
         sold_at = EXCLUDED.sold_at, prev = EXCLUDED.prev, added_at = EXCLUDED.added_at
-      WHERE (accounts.raw, accounts.acc_user, accounts.batch, accounts.status, accounts.in_list, accounts.note, accounts.sale, accounts.sold_at, accounts.prev, accounts.added_at)
-        IS DISTINCT FROM (EXCLUDED.raw, EXCLUDED.acc_user, EXCLUDED.batch, EXCLUDED.status, EXCLUDED.in_list, EXCLUDED.note, EXCLUDED.sale, EXCLUDED.sold_at, EXCLUDED.prev, EXCLUDED.added_at)`, [userId, json])
+      WHERE (accounts.raw, accounts.acc_user, accounts.batch, accounts.status, accounts.in_list, accounts.note, accounts.event, accounts.sale, accounts.sold_at, accounts.prev, accounts.added_at)
+        IS DISTINCT FROM (EXCLUDED.raw, EXCLUDED.acc_user, EXCLUDED.batch, EXCLUDED.status, EXCLUDED.in_list, EXCLUDED.note, EXCLUDED.event, EXCLUDED.sale, EXCLUDED.sold_at, EXCLUDED.prev, EXCLUDED.added_at)`, [userId, json])
     await c.query(`DELETE FROM accounts a WHERE a.user_id = $1
       AND NOT EXISTS (SELECT 1 FROM jsonb_to_recordset($2::jsonb) AS x(id bigint) WHERE x.id = a.id)`, [userId, json])
     await c.query(`INSERT INTO user_meta (user_id, value) VALUES ($1, $2)
@@ -45,13 +45,13 @@ async function writeStore(userId, j) {
 async function readStore(userId) {
   const [row, list] = await Promise.all([
     one('SELECT value FROM user_meta WHERE user_id = $1', [userId]),
-    rows(`SELECT id, raw, acc_user, batch, status, in_list, note, sale, sold_at, prev, added_at
+    rows(`SELECT id, raw, acc_user, batch, status, in_list, note, event, sale, sold_at, prev, added_at
       FROM accounts WHERE user_id = $1 ORDER BY id`, [userId]),
   ])
   if (!row) return null
   const accounts = list.map(r => ({
     id: r.id, raw: r.raw, user: r.acc_user, batch: r.batch, status: r.status, inList: r.in_list,
-    note: r.note, sale: r.sale, soldAt: r.sold_at, prev: r.prev, addedAt: r.added_at,
+    note: r.note, event: r.event, sale: r.sale, soldAt: r.sold_at, prev: r.prev, addedAt: r.added_at,
   }))
   return { ...JSON.parse(row.value), accounts }
 }

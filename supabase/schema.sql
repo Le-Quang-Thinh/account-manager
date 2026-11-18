@@ -29,12 +29,15 @@ create table if not exists accounts (
   status text not null,
   in_list boolean not null default true,
   note text not null default '',
+  event text not null default '',
   sale text not null default '',
   sold_at bigint,
   prev text not null default 'special',
   added_at bigint not null default 0,
   primary key (user_id, id)
 );
+-- Bổ sung cho DB đã tạo trước khi có cột event (create table if not exists không thêm cột mới)
+alter table accounts add column if not exists event text not null default '';
 create index if not exists idx_accounts_user on accounts(user_id, lower(acc_user));
 create index if not exists idx_accounts_status on accounts(user_id, status);
 create index if not exists idx_accounts_batch on accounts(user_id, batch);

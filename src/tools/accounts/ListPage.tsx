@@ -235,6 +235,11 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
     : []
   const hasEvents = eventChips.some(([e]) => e !== '')
   const pickEvent = (e: string | null) => { setFe(e); setFn(new Set()); setLimit(PAGE) }
+  // Mỗi lần vào tab có event, mặc định chọn event đầu tiên (thay vì "Tất cả")
+  useEffect(() => {
+    if (isNoteTab && hasEvents && fe === null) pickEvent(eventChips[0][0])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, hasEvents])
   // các ghi chú đang có trong tab (theo batch + event đang lọc), kèm số account
   const noteChips = isNoteTab
     ? noteGroups(S.accounts.filter(a => a.status === tab && (fb === 'all' || a.batch === fb) && (fe === null || (a.event || '') === fe))).map(g => ({ note: g.note, n: g.items.length }))
@@ -445,12 +450,12 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
       {isNoteTab && hasEvents && (
         <div className="notefilter" role="group" aria-label="Lọc theo event">
           <span className="hint-inline">Event (cũng áp dụng khi xuất file):</span>
-          <button className={'chip' + (fe === null ? ' on' : '')} aria-pressed={fe === null} onClick={() => pickEvent(null)}>Tất cả</button>
           {eventChips.map(([e, n]) => (
             <button key={e || '__none'} className={'chip' + (fe === e ? ' on' : '')} aria-pressed={fe === e} onClick={() => pickEvent(fe === e ? null : e)}>
               {e || 'Không event'} ({n})
             </button>
           ))}
+          <button className={'chip' + (fe === null ? ' on' : '')} aria-pressed={fe === null} onClick={() => pickEvent(null)}>Tất cả</button>
         </div>
       )}
       {isNoteTab && noteChips.length > 0 && (
