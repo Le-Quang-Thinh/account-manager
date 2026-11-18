@@ -7,6 +7,7 @@ const { addGreenraidBatch } = require('./store-api.cjs')
 const { addUser, setPassword, delUser, listUsers, find } = require('./user-admin.cjs')
 const { lockedFor, noteFail, clearFails } = require('./throttle.cjs')
 const notion = require('./notion.cjs')
+const sheet = require('./sheet.cjs')
 
 const STATUS = { farm: 'Farm', special: 'Special', sold: 'Đã bán' }
 const MAX_SHOWN = 20
@@ -29,6 +30,7 @@ function createBot(token) {
     '/search <từ khoá> – tìm account',
     '/export farm|special|sold|all – nhận file .txt',
     'Gửi file .txt vào chat – import thành 1 batch Green Raid (caption = tên batch, bỏ trống thì lấy tên file)',
+    '/sheet [n] – xem n dòng cuối của Google Sheet log (mặc định 5)',
     '/notion <từ khoá> – tìm page/database trong Notion',
     '/report – gửi báo cáo tuần Notion (vào TELEGRAM_CHAT_ID nếu có, không thì vào chat này)',
     '/ndb [id|url] – liệt kê dòng của database Notion (mặc định NOTION_DATABASE_ID)',
@@ -147,6 +149,13 @@ function createBot(token) {
 
   // Telegram giới hạn 4096 ký tự/tin nhắn
   const cut = s => s.length > 3900 ? s.slice(0, 3900) + '\n…(đã cắt bớt)' : s
+
+  bot.command('sheet', guard(async ctx => tryDo(ctx, async () => {
+    const n = parseInt((ctx.match || '').trim(), 10)
+    const { total, n: shown, text } = await sheet.lastRows(Number.isFinite(n) ? n : sheet.DEFAULT_N)
+    if (!total) return 'Sheet chưa có dòng dữ liệu nào.'
+    return cut(`📄 ${shown} dòng cuối (tổng ${total}):\n\n${text}`)
+  })))
 
   bot.command('notion', guard(async ctx => {
     const q = (ctx.match || '').trim()
