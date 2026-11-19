@@ -1,5 +1,6 @@
 import type { Account, BatchMeta, Settings, Status, Store } from './types'
 import type { ZipFile } from '../../shared/lib/zip'
+import type { OutFile } from '../../shared/lib/fs'
 
 export const PAGE = 400 // số dòng hiện mỗi lần
 const API = './api/store'
@@ -484,6 +485,24 @@ export function chunkByNote(list: Account[], size: number, kind: string) {
 // Nhóm hiển thị / copy: nhóm thứ g (từ 0) của batch b trong danh sách đang hiện
 export function groupSlice(list: Account[], b: number, g: number, G: number) { return list.filter(a => a.batch === b).slice(g * G, (g + 1) * G) }
 export const rawText = (list: Account[]) => list.map(a => a.raw).join(NL())
+
+// --- Xuất thẳng vào thư mục người dùng chọn (File System Access) ---
+// Mỗi batch 1 file: <prefix>-<tên-batch>.txt (vd farm-batchname.txt)
+export function batchFiles(list: Account[], prefix: string): OutFile[] {
+  const groups = new Map<number, Account[]>()
+  for (const a of list) { const g = groups.get(a.batch); if (g) g.push(a); else groups.set(a.batch, [a]) }
+  return [...groups.keys()].sort((x, y) => x - y).map(b => {
+    const name = noteSlug(S.batchMeta[b]?.name || '') || `batch${b}`
+    return { path: `${prefix}-${name}.txt`, text: groups.get(b)!.map(a => a.raw).join(NL()) }
+  })
+}
+// Mỗi ghi chú 1 file: <prefix>-<ghi-chú>.txt (vd special-namespecial.txt)
+export function noteFiles(list: Account[], prefix: string): OutFile[] {
+  return noteGroups(list).map(g => ({
+    path: `${prefix}-${noteSlug(g.note) || 'khong-ghi-chu'}.txt`,
+    text: g.items.map(a => a.raw).join(NL()),
+  }))
+}
 export function csvCell(v: unknown) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"' }
 export const STL: Record<Status, string> = { farm: 'Farm', special: 'Special', sold: 'Đã bán' }
 export function fmtDate(t: number | null) {

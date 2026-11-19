@@ -3,9 +3,11 @@ import type { ChangeEvent, ClipboardEvent, ReactNode } from 'react'
 import {
   S, save, fresh, normalize, replaceS, isFileStorage, importLines, bulkSpecial, bulkSell, logToSpecial, addTags, removeTag,
   chunkByBatch, chunkByNote, rawText, toCSV, noteOrder, batchIds, batchLabel, deleteBatches, mergeBatches, toggleHiddenTag,
+  batchFiles, noteFiles,
 } from './store'
 import { stamp, download } from '../../shared/lib/browser'
 import { makeZip } from '../../shared/lib/zip'
+import { fsSupported, pickDir, writeFiles } from '../../shared/lib/fs'
 import type { Account, Ctx } from './types'
 
 export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored: () => void }) {
@@ -167,6 +169,27 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
   }
   const B = ({ k, children }: { k: string; children: ReactNode }) => <button className="btn" onClick={() => run(k)}>{children}</button>
 
+  // Xuất thẳng vào thư mục người dùng chọn, giữ cấu trúc manage-account/{farm,list,special,sell}/
+  const exportToFolder = async () => {
+    if (!fsSupported()) { toast('Trình duyệt này không hỗ trợ chọn thư mục. Hãy dùng Chrome/Edge, hoặc tải .zip ở trên.'); return }
+    const farm = all('farm'), list = all('list'), special = all('special'), sold = all('sold')
+    if (!farm.length && !list.length && !special.length && !sold.length) { toast('Không có account nào để xuất.'); return }
+    const root = await pickDir()
+    if (!root) return // user huỷ chọn
+    const files = [
+      ...batchFiles(farm, 'farm'),
+      ...batchFiles(list, 'list'),
+      ...noteFiles(special, 'special'),
+      ...noteFiles(sold, 'sell'),
+    ]
+    try {
+      const n = await writeFiles(root, files)
+      toast(`Đã ghi ${n} file vào thư mục đã chọn (farm-… · list-… · special-… · sell-…).`)
+    } catch (e) {
+      toast('Không ghi được vào thư mục (có thể bị từ chối quyền ghi). Thử lại, hoặc tải .zip.')
+    }
+  }
+
   return (
     <>
       <header className="head"><div><h1>Nhập / Xuất</h1><p className="sub">Nhập batch mới, đánh dấu Special hàng loạt, xuất file và sao lưu.</p></div></header>
@@ -204,6 +227,11 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
         </section>
         <section className="sec"><h2>Xuất file</h2>
           <p>Farm và Danh sách: .zip tách theo batch, mỗi file đúng số dòng đặt bên dưới (tên dạng <code>batch2-farm-01.txt</code>). Special và Đã bán: .zip tách theo ghi chú, mỗi ghi chú một file, nhóm quá dài sẽ chia thêm -p01, -p02.</p>
+          <p>Hoặc ghi thẳng vào một thư mục trên máy (Chrome/Edge): mỗi lần sẽ hỏi chọn thư mục. Farm/Danh sách mỗi batch một file <code>farm-tênbatch.txt</code> / <code>list-tênbatch.txt</code>; Special/Đã bán mỗi ghi chú một file <code>special-ghichú.txt</code> / <code>sell-ghichú.txt</code>.</p>
+          <div className="row">
+            <button className="btn solid" onClick={exportToFolder} disabled={!fsSupported()} title={fsSupported() ? undefined : 'Trình duyệt không hỗ trợ — dùng Chrome/Edge'}>📁 Xuất vào thư mục</button>
+            {!fsSupported() && <span className="hint">Trình duyệt này không hỗ trợ chọn thư mục, hãy dùng nút .zip bên dưới.</span>}
+          </div>
           <div className="row"><B k="zipFarm">Farm .zip</B><B k="zipList">Danh sách .zip</B><B k="zipSpecial">Special .zip</B><B k="zipSold">Đã bán .zip</B></div>
           <div className="row"><B k="txtFarm">Farm .txt</B><B k="txtList">Danh sách .txt</B><B k="txtSpecial">Special .txt</B><B k="txtSold">Đã bán .txt</B></div>
           <div className="row"><B k="csvList">Danh sách .csv</B><B k="csvSpecial">Special .csv</B><B k="csvSold">Đã bán .csv</B>
