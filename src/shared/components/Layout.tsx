@@ -40,3 +40,13 @@ export function CaseToggle({ checked, onChange }: { checked: boolean; onChange: 
     </label>
   )
 }
+
+// Chỉ so trùng theo username (phần trước dấu ":"), bỏ phần pass. vd aaa:gameol và aaa:xxx coi là trùng.
+export function UserOnlyToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="fld case-toggle" title="Tách pass, chỉ lấy username (phần trước dấu &quot;:&quot;) để so trùng">
+      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} />
+      Chỉ so username
+    </label>
+  )
+}

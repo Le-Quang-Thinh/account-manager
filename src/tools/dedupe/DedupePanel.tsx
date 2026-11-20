@@ -30,15 +30,15 @@ function DuplicateModal({ view, onClose }: { view: DupView; onClose: () => void 
 }
 
 // Lõi "Lọc trùng" dùng chung cho tab (DedupeTool) và modal toàn cục (DedupeModal).
-// caseSensitive được truyền từ ngoài để nơi dùng tự đặt nút bật/tắt ở đâu tuỳ ý.
-export function DedupePanel({ caseSensitive }: { caseSensitive: boolean }) {
+// caseSensitive / userOnly được truyền từ ngoài để nơi dùng tự đặt nút bật/tắt ở đâu tuỳ ý.
+export function DedupePanel({ caseSensitive, userOnly = false }: { caseSensitive: boolean; userOnly?: boolean }) {
   const [textA, setTextA] = useState('')
   const [textB, setTextB] = useState('')
   const [modal, setModal] = useState<DupView | null>(null)
   // dữ liệu lớn: ô nhập luôn mượt, kết quả cập nhật sau
   const dA = useDeferredValue(textA)
   const dB = useDeferredValue(textB)
-  const d = useMemo(() => compareFiles(dA, dB, caseSensitive), [dA, dB, caseSensitive])
+  const d = useMemo(() => compareFiles(dA, dB, caseSensitive, userOnly), [dA, dB, caseSensitive, userOnly])
   const hasB = dB.trim().length > 0 // có File 2 thì so sánh, không thì chỉ lọc trùng File 1
 
   const dupBadge = (n: number, title: string, content: string, filename: string) => n > 0 && (

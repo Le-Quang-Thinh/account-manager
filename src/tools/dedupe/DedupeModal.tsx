@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { DedupePanel } from './DedupePanel'
-import { CaseToggle } from '../../shared/components/Layout'
+import { CaseToggle, UserOnlyToggle } from '../../shared/components/Layout'
 import { Icon } from '../../shared/components/Icon'
 
 // "Lọc trùng" dạng cửa sổ dùng được ở mọi tab. Luôn gắn sẵn (chỉ ẩn/hiện) nên
 // nội dung đã dán vẫn còn khi đóng rồi mở lại trong cùng phiên.
 export function DedupeModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [caseSensitive, setCaseSensitive] = useState(true)
+  const [userOnly, setUserOnly] = useState(false)
   useEffect(() => {
     if (!open) return
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -20,11 +21,12 @@ export function DedupeModal({ open, onClose }: { open: boolean; onClose: () => v
         <div className="pane-h">
           <h3>Lọc trùng</h3>
           <span className="sp" />
+          <UserOnlyToggle checked={userOnly} onChange={setUserOnly} />
           <CaseToggle checked={caseSensitive} onChange={setCaseSensitive} />
           <button type="button" className="btn sm icon-btn" aria-label="Đóng" onClick={onClose}><Icon name="close" size={14} /></button>
         </div>
         <div className="dedupe-modal-body">
-          <DedupePanel caseSensitive={caseSensitive} />
+          <DedupePanel caseSensitive={caseSensitive} userOnly={userOnly} />
         </div>
       </div>
     </div>

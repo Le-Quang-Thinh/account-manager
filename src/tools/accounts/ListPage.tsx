@@ -145,6 +145,11 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
     copyText(rawText(list)).then(() => toast(`Đã copy ${list.length} dòng (${label}).`))
       .catch(() => toast('Không copy tự động được. Hãy chọn chế độ Văn bản rồi bôi đen và Ctrl+C.'))
   }
+  // Gộp toàn bộ account Special + Đã bán (mọi batch, bỏ qua bộ lọc), gom theo ghi chú: Special trước, Đã bán sau.
+  const allSpecialSold = () => [
+    ...noteOrder(S.accounts.filter(a => a.status === 'special')),
+    ...noteOrder(S.accounts.filter(a => a.status === 'sold')),
+  ]
   const doSell = (ids: number[]) => {
     ids = ids.filter(id => { const a = S.accounts.find(x => x.id === id); return a && a.status === 'special' })
     if (!ids.length) { toast('Chưa chọn account Special nào để bán.'); return }
@@ -431,6 +436,10 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
             <button className={view === 'text' ? 'on' : ''} aria-pressed={view === 'text'} title="Hiện từng nhóm trong ô văn bản để bôi đen và Ctrl+C" onClick={() => { S.settings.view = 'text'; commit() }}>Văn bản</button>
           </div>
           <button className="btn solid" onClick={() => doCopy(ordered, 'tất cả đang hiện')}>Copy tất cả ({ordered.length})</button>
+          {(() => {
+            const n = S.accounts.reduce((t, a) => t + (a.status === 'special' || a.status === 'sold' ? 1 : 0), 0)
+            return <button className="btn" title="Copy toàn bộ account Special và Đã bán (mọi batch, không phụ thuộc bộ lọc)" disabled={!n} onClick={() => doCopy(allSpecialSold(), 'Special + Đã bán')}>Copy Special + Đã bán ({n})</button>
+          })()}
           <div className="menu-wrap">
             <button className="btn" aria-haspopup="menu" onClick={() => setMenu(m => !m)}>Xuất file</button>
             <div className="menu" role="menu" hidden={!menu}>
