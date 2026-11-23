@@ -6,7 +6,7 @@ export const PAGE = 400 // số dòng hiện mỗi lần
 const API = './api/store'
 
 export function defSettings(): Settings { return { chunk: 100, group: 20, crlf: true, view: 'table' } }
-export function fresh(): Store { return { v: 3, settings: defSettings(), accounts: [], seq: 1, batchSeq: 0, batchMeta: {}, tags: [], hiddenTags: [] } }
+export function fresh(): Store { return { v: 3, settings: defSettings(), accounts: [], seq: 1, batchSeq: 0, batchMeta: {}, tags: [], hiddenTags: [], events: ['dynamax'] } }
 
 // Chuẩn hoá dữ liệu đọc từ file hoặc file sao lưu (có thể là bản cũ). Trả về null nếu không đúng dạng.
 export function normalize(raw: unknown): Store | null {
@@ -22,6 +22,7 @@ export function normalize(raw: unknown): Store | null {
   j.batchMeta = j.batchMeta || {}
   j.tags = Array.isArray(j.tags) ? j.tags.filter((x: unknown) => typeof x === 'string' && x.trim()).map((x: string) => x.trim()) : []
   j.hiddenTags = Array.isArray(j.hiddenTags) ? j.hiddenTags.filter((x: unknown) => typeof x === 'string' && j.tags.includes(x)) : []
+  j.events = Array.isArray(j.events) ? j.events.filter((x: unknown) => typeof x === 'string' && x.trim()).map((x: string) => x.trim()) : ['dynamax']
   let legacy = false
   for (const a of j.accounts as Account[]) {
     if (!a.batch) { a.batch = 1; legacy = true } // dữ liệu bản cũ -> Batch 1
@@ -147,6 +148,20 @@ export function toggleHiddenTag(t: string) {
   else S.hiddenTags.push(t)
 }
 export const pickTags = () => S.tags.filter(t => !S.hiddenTags.includes(t)) // tag còn dùng để chọn
+
+// Event special đã lưu để gợi ý và dùng lại. Bỏ trùng không phân biệt hoa thường.
+export function addEvent(name: string) {
+  const t = String(name || '').trim()
+  if (!t) return false
+  if (S.events.some(x => x.toLowerCase() === t.toLowerCase())) return false
+  S.events.push(t)
+  return true
+}
+export function removeEvent(name: string) {
+  const i = S.events.findIndex(x => x.toLowerCase() === String(name).toLowerCase())
+  if (i >= 0) S.events.splice(i, 1)
+  return i >= 0
+}
 
 export const NL = () => S.settings.crlf ? '\r\n' : '\n'
 export const parseUser = (r: string) => (r.trim().split(/[|:;,\t ]+/)[0]) || r

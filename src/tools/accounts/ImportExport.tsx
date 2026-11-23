@@ -3,7 +3,7 @@ import type { ChangeEvent, ClipboardEvent, ReactNode } from 'react'
 import {
   S, save, fresh, normalize, replaceS, isFileStorage, importLines, bulkSpecial, bulkSell, logToSpecial, addTags, removeTag,
   chunkByBatch, chunkByNote, rawText, toCSV, noteOrder, batchIds, batchLabel, deleteBatches, mergeBatches, toggleHiddenTag,
-  batchFiles, noteFiles,
+  batchFiles, noteFiles, addEvent, removeEvent,
 } from './store'
 import { stamp, download } from '../../shared/lib/browser'
 import { makeZip } from '../../shared/lib/zip'
@@ -91,6 +91,18 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
     const n = addTags(tagIn)
     commit(); setTagIn('')
     toast(n ? `Đã thêm ${n} tag.` : 'Tag đã có sẵn.')
+  }
+  // Lưu event đang gõ vào danh sách gợi ý để dùng lại lần sau
+  const saveEvent = () => {
+    const t = spEvent.trim()
+    if (!t) { toast('Chưa nhập tên event.'); return }
+    const added = addEvent(t)
+    commit()
+    toast(added ? `Đã lưu event "${t}".` : `Event "${t}" đã có sẵn.`)
+  }
+  const delEvent = (ev: string) => {
+    if (!confirm(`Xoá event "${ev}" khỏi danh sách gợi ý? Account đã gắn event này vẫn giữ nguyên.`)) return
+    removeEvent(ev); commit()
   }
   const restore = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
@@ -208,10 +220,21 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
           <p>Điền ô <b>Event</b> bên dưới (vd <code>dynamax</code>) thì <b>cả đợt</b> special nhập vào đều thuộc event đó; để trống = special thường. Muốn gắn event riêng cho vài dòng thì thêm hậu tố <code>@tên-event</code> ở cuối dòng. Ở tab Special sẽ có hàng lọc theo event, mỗi event vẫn gom nhóm theo tên pokemon.</p>
           <p>Có thể copy thẳng các dòng log từ Google Sheet (kèm hoặc không kèm dòng header) và dán vào: tool tự đổi thành <code>username:mật khẩu # pokemon_name</code>, thêm <code>_XXS</code> / <code>_XXL</code> nếu size là XXS hoặc XXL. Riêng costume <code>Specialbackground2025Global</code> tự gắn hậu tố <code>@dynamax</code> (vào event dynamax, giữ nguyên tên pokemon). Dòng không có username sẽ bị bỏ qua.</p>
           <div className="row">
-            <input className="inp" type="text" value={spEvent} onChange={e => setSpEvent(e.target.value)} placeholder="Event (vd dynamax, để trống = special thường)" aria-label="Event cho đợt special này" list="sp-events" style={{ minWidth: 300 }} />
-            <datalist id="sp-events"><option value="dynamax" /></datalist>
+            <input className="inp" type="text" value={spEvent} onChange={e => setSpEvent(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveEvent()} placeholder="Event (vd dynamax, để trống = special thường)" aria-label="Event cho đợt special này" list="sp-events" style={{ minWidth: 300 }} />
+            <datalist id="sp-events">{S.events.map(ev => <option key={ev} value={ev} />)}</datalist>
+            <button className="btn" onClick={saveEvent} disabled={!spEvent.trim()}>+ Lưu event</button>
             <input className="inp" type="text" value={spPass} onChange={e => setSpPass(e.target.value)} placeholder="Mật khẩu khi dán log" aria-label="Mật khẩu gắn vào khi dán log" style={{ minWidth: 230 }} />
           </div>
+          {S.events.length > 0 && (
+            <div className="chips">
+              {S.events.map(ev => (
+                <span key={ev} className="chip rm">
+                  <button type="button" className="chip-pick" onClick={() => setSpEvent(ev)} title="Dùng event này">{ev}</button>
+                  <button aria-label={`Xoá event ${ev}`} onClick={() => delEvent(ev)}>×</button>
+                </span>
+              ))}
+            </div>
+          )}
           <textarea className="ta" style={{ minHeight: 110 }} value={sp} onChange={e => setSp(e.target.value)} onPaste={pasteLog} placeholder={'account5:pass5 # skin hiếm\naccount9 # rank cao\n(hoặc dán log từ Google Sheet)'} aria-label="Danh sách special" />
           <div className="row"><button className="btn star" onClick={doBulk}>Chuyển sang Special</button></div>
         </section>

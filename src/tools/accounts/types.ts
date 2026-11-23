@@ -36,6 +36,7 @@ export interface Store {
   batchMeta: Record<number, BatchMeta>
   tags: string[]
   hiddenTags: string[] // tag đã ẩn: không hiện trong ô chọn / nút gắn tag, nhưng vẫn lọc và sắp xếp được
+  events: string[] // danh sách event special đã lưu (vd "dynamax") để gợi ý và dùng lại
 }
 
 export interface Ctx {
