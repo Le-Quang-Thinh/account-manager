@@ -500,6 +500,13 @@ export function chunkByNote(list: Account[], size: number, kind: string) {
 // Nhóm hiển thị / copy: nhóm thứ g (từ 0) của batch b trong danh sách đang hiện
 export function groupSlice(list: Account[], b: number, g: number, G: number) { return list.filter(a => a.batch === b).slice(g * G, (g + 1) * G) }
 export const rawText = (list: Account[]) => list.map(a => a.raw).join(NL())
+// Copy gom nhóm theo ghi chú: mỗi nhóm 1 dòng tiêu đề "=== ghi chú (N) ===" rồi tới các account.
+export const rawTextNote = (list: Account[]) => {
+  const nl = NL()
+  return noteGroups(list)
+    .map(g => `=== ${g.note || '(không ghi chú)'} (${g.items.length}) ===${nl}${g.items.map(a => a.raw).join(nl)}`)
+    .join(nl + nl)
+}
 
 // --- Xuất thẳng vào thư mục người dùng chọn (File System Access) ---
 // Mỗi batch 1 file: <prefix>-<tên-batch>.txt (vd farm-batchname.txt)

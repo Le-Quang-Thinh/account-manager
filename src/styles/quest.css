@@ -1,0 +1,103 @@
+/* ===== Tool Làm quest ===== */
+.quest{min-width:0}
+.quest .head-c{align-items:center}
+.q-auto{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--mute);cursor:pointer;white-space:nowrap}
+.q-auto input{width:16px;height:16px;accent-color:var(--teal)}
+.q-import{cursor:pointer}
+
+/* chọn đợt */
+.q-batches{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.q-batches.hist{margin-top:-4px;padding:8px 10px;border:1px dashed var(--line);border-radius:10px;background:var(--raised)}
+.q-chip{border:1px solid var(--line);background:var(--raised);color:var(--mute);border-radius:999px;padding:6px 14px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
+.q-chip:hover{color:var(--ink);border-color:var(--ink)}
+.q-chip.on{background:var(--ink);border-color:var(--ink);color:var(--bg);font-weight:600}
+.q-chip.ghost{background:transparent;border-style:dashed}
+.q-chip.done{color:var(--faint)}
+
+/* banner hành động hằng ngày */
+.q-banner{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin:0 0 10px;padding:12px 16px;border:1px solid var(--edge);border-radius:12px;background:linear-gradient(90deg,rgba(74,220,230,.1),transparent)}
+.q-banner b{color:var(--ink);font-weight:700;font-size:16px}
+.q-banner.ready{border-color:var(--amber);background:linear-gradient(90deg,var(--amber-bg),transparent)}
+.q-banner.ready b{color:var(--amber)}
+
+/* thanh lọc + tìm */
+.q-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px}
+.q-toolbar .subtabs{margin:0;flex:1 1 auto}
+.q-toolbar .search{width:200px}
+
+/* thanh chọn hàng loạt */
+.q-bulk{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px;padding:7px 12px;border-radius:8px;background:var(--ink);color:var(--bg)}
+.q-bulk b{font-weight:700}
+.q-bulk .btn{background:transparent;color:inherit;border-color:currentColor}
+.q-bulk .btn.teal{background:var(--teal);border-color:var(--teal);color:var(--on-teal)}
+.q-bulk .btn.star{background:var(--amber);border-color:var(--amber);color:#1C1400}
+.q-bulk .btn:hover{background:rgba(127,127,127,.25)}
+.q-bulk .btn.teal:hover{background:var(--teal-hover);border-color:var(--teal-hover)}
+
+/* danh sách dày */
+.q-list{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.q-row{display:grid;grid-template-columns:40px minmax(0,1fr) 150px 130px 180px;align-items:center;gap:12px;padding:5px 12px;min-height:40px}
+.q-head-row{background:var(--raised);color:var(--mute);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;min-height:36px}
+.q-item{border-top:1px solid var(--line)}
+.q-item:first-child{border-top:0}
+.q-item .q-row:hover{background:var(--hover)}
+.q-item.open{background:var(--raised)}
+.q-row.s-done{color:var(--mute)}
+.q-row.s-ready{box-shadow:inset 3px 0 0 var(--amber)}
+.q-row.s-caught-today{box-shadow:inset 3px 0 0 var(--teal)}
+.quest .cb{display:inline-flex;align-items:center;cursor:pointer;min-height:0;padding:0}
+.quest .cb input{width:16px;height:16px;margin:0;accent-color:var(--teal);cursor:pointer}
+.q-acc{font-family:var(--mono);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.q-acc-btn{text-align:left;border:0;background:transparent;color:var(--ink);cursor:pointer;padding:2px 0;min-width:0}
+.q-acc-btn:hover{color:var(--teal-tx)}
+.q-c-act{justify-self:start}
+
+/* chấm tiến trình 5 ngày */
+.q-dots{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.q-dots i{width:9px;height:9px;border-radius:50%;background:var(--line)}
+.q-dots i.on{background:var(--teal)}
+.q-dots b{margin-left:4px;font-size:12px;font-weight:600;color:var(--mute);font-variant-numeric:tabular-nums}
+
+/* pill trạng thái */
+.q-st{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid transparent;white-space:nowrap}
+.q-st.s-new{background:var(--slate-bg);color:var(--faint)}
+.q-st.s-doing{background:var(--teal-bg);color:var(--teal-tx);border-color:rgba(74,220,230,.3)}
+.q-st.s-caught-today{background:var(--teal-bg);color:var(--teal-tx);border-color:rgba(74,220,230,.3)}
+.q-st.s-ready{background:var(--amber-bg);color:var(--amber-tx);border-color:rgba(255,230,0,.34)}
+.q-st.s-done{background:var(--slate-bg);color:var(--slate)}
+
+.q-done-tag{display:inline-flex;align-items:center;gap:5px;color:var(--teal-tx);font-size:13px;font-weight:600}
+.q-today-tag{display:inline-flex;align-items:center;gap:8px;color:var(--mute);font-size:13px}
+
+/* chi tiết mở rộng */
+.q-detail{padding:10px 12px 12px 52px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:10px;background:var(--raised)}
+.q-detail-days{display:flex;align-items:center;flex-wrap:wrap;gap:7px;font-size:13px}
+.q-detail-lb{color:var(--mute)}
+.q-day{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:12px;background:var(--teal-bg);color:var(--teal-tx);border:1px solid rgba(74,220,230,.3);border-radius:6px;padding:2px 4px 2px 8px}
+.q-day button{border:0;background:transparent;color:inherit;cursor:pointer;font-size:15px;line-height:1;padding:0 2px}
+.q-day button:hover{color:var(--danger)}
+.q-detail-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.q-note{flex:1;min-width:160px}
+.q-detail .dim{color:var(--faint);font-size:12px}
+.q-list .dim{color:var(--faint)}
+
+/* chế độ lưới (phụ) */
+.q-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.q-card{display:flex;flex-direction:column;gap:9px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:14px}
+.q-card.s-ready{border-color:var(--amber)}
+.q-card.s-done{opacity:.6}
+.q-card-h{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.q-card .q-acc{flex:1}
+.q-card-act{margin-top:2px}
+.q-card-act .btn{width:100%}
+.q-eta{font-size:12px}
+
+@media (max-width:760px){
+  .q-row{grid-template-columns:32px minmax(0,1fr) auto;row-gap:6px;padding:8px 12px}
+  .q-row .q-st{grid-column:2;justify-self:start}
+  .q-row .q-c-act{grid-column:1 / -1;justify-self:stretch}
+  .q-c-act .btn,.q-today-tag{width:100%;justify-content:center}
+  .q-head-row{display:none}
+  .q-detail{padding-left:12px}
+  .q-toolbar .search{width:100%;flex:1}
+}

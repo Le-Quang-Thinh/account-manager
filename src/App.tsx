@@ -7,20 +7,20 @@ import { Icon } from './shared/components/Icon'
 // Mỗi nhóm công cụ tách thành một chunk riêng, chỉ tải khi mở lần đầu
 const AccountsTool = lazy(() => import('./tools/accounts/AccountsTool'))
 const GreenRaidTool = lazy(() => import('./tools/greenraid/GreenRaidTool'))
+const QuestTool = lazy(() => import('./tools/quest/QuestTool'))
 const EventsTool = lazy(() => import('./tools/events/EventsTool'))
-const EternatusTool = lazy(() => import('./tools/eternatus/EternatusTool'))
 const NotesTool = lazy(() => import('./tools/notes/NotesTool'))
 const WorldClockTool = lazy(() => import('./tools/worldclock/WorldClockTool'))
 const SplitTool = lazy(() => import('./tools/split/SplitTool'))
 const TransformTool = lazy(() => import('./tools/transform/TransformTool'))
 
-type ToolId = 'accounts' | 'greenraid' | 'events' | 'eternatus' | 'notes' | 'worldclock' | 'split' | 'transform'
+type ToolId = 'accounts' | 'greenraid' | 'quest' | 'events' | 'notes' | 'worldclock' | 'split' | 'transform'
 
 const TOOLS: { id: ToolId; label: string }[] = [
   { id: 'accounts', label: 'Quản lý account' },
   { id: 'greenraid', label: 'Quản lý 27 thẻ' },
+  { id: 'quest', label: 'Làm quest' },
   { id: 'events', label: 'Note event' },
-  { id: 'eternatus', label: 'Eternatus' },
   { id: 'notes', label: 'Ghi chú' },
   { id: 'worldclock', label: 'Giờ thế giới' },
   { id: 'split', label: 'Chia và tách' },
@@ -32,8 +32,8 @@ function Body({ id, toast, userKey, dataVer }: { id: ToolId; toast: (m: string) 
   switch (id) {
     case 'accounts': return <AccountsTool key={dataVer} toast={toast} />
     case 'greenraid': return <GreenRaidTool toast={toast} userKey={userKey} />
+    case 'quest': return <QuestTool toast={toast} userKey={userKey} />
     case 'events': return <EventsTool toast={toast} />
-    case 'eternatus': return <EternatusTool toast={toast} />
     case 'notes': return <NotesTool toast={toast} />
     case 'worldclock': return <WorldClockTool toast={toast} />
     case 'split': return <SplitTool />

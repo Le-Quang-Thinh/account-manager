@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { MouseEventHandler, ReactElement } from 'react'
 import {
   S, STL, fmtDate, noteGroups, noteOrder, inListAccounts, inListFarm,
-  chunkByBatch, chunkByNote, rawText, toCSV, setSpecial, setFarm, setNote, sell, unsell,
+  chunkByBatch, chunkByNote, rawText, rawTextNote, toCSV, setSpecial, setFarm, setNote, sell, unsell,
   editRaw, moveBatch, batchIds, farmCount,
   confirmList, applyTag, addTags, pickTags,
   PAGE,
@@ -75,20 +75,20 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
   const locked = tab === 'farm' && !!farmLock
   const showSt = isList || locked
   const view = S.settings.view === 'text' ? 'text' : 'table'
-  const [menu, setMenu] = useState(false)
+  const [openMenu, setOpenMenu] = useState<'export' | 'more' | null>(null)
   const [adding, setAdding] = useState(false)
   const canAdd = tab === 'farm' || isList
   const lastSel = useRef<number | null>(null)
   const shift = useRef(false)
 
   useEffect(() => {
-    if (!menu) return
-    const close = (e: MouseEvent) => { if (!(e.target as Element).closest('.menu-wrap')) setMenu(false) }
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenu(false) }
+    if (!openMenu) return
+    const close = (e: MouseEvent) => { if (!(e.target as Element).closest('.menu-wrap')) setOpenMenu(null) }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenMenu(null) }
     document.addEventListener('click', close)
     document.addEventListener('keydown', esc)
     return () => { document.removeEventListener('click', close); document.removeEventListener('keydown', esc) }
-  }, [menu])
+  }, [openMenu])
 
   const C = () => S.settings.chunk
   const G = Math.max(1, S.settings.group)
@@ -143,6 +143,12 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
   const doCopy = (list: Account[], label: string) => {
     if (!list.length) { toast('Không có dòng nào để copy.'); return }
     copyText(rawText(list)).then(() => toast(`Đã copy ${list.length} dòng (${label}).`))
+      .catch(() => toast('Không copy tự động được. Hãy chọn chế độ Văn bản rồi bôi đen và Ctrl+C.'))
+  }
+  // Copy kèm ghi chú: gom nhóm theo ghi chú, mỗi nhóm có dòng tiêu đề.
+  const doCopyNote = (list: Account[], label: string) => {
+    if (!list.length) { toast('Không có dòng nào để copy.'); return }
+    copyText(rawTextNote(list)).then(() => toast(`Đã copy ${list.length} dòng kèm ghi chú (${label}).`))
       .catch(() => toast('Không copy tự động được. Hãy chọn chế độ Văn bản rồi bôi đen và Ctrl+C.'))
   }
   // Gộp toàn bộ account Special + Đã bán (mọi batch, bỏ qua bộ lọc), gom theo ghi chú: Special trước, Đã bán sau.
@@ -212,7 +218,7 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
     return fb === 'all' || a.batch === fb
   })
   const exportAct = (act: string) => {
-    setMenu(false)
+    setOpenMenu(null)
     const empty = () => toast('Không có account nào để xuất.')
     const map: Record<string, () => void> = {
       zipFarm: () => { const f = chunkByBatch(scope('farm'), C(), 'farm'); if (!f.length) return empty(); download(`farm-${stamp()}.zip`, makeZip(f)) },
@@ -383,7 +389,7 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
             <td className="c-n">{pos}</td>
             {isNoteTab && <td className="c-batch">Batch {a.batch}</td>}
             <td><RawCell raw={a.raw} /></td>
-            {showSt && <td className="c-st"><span className="st"><span className={'dot ' + a.status} />{STL[a.status]}</span></td>}
+            {showSt && <td className="c-st"><span className={'st s-' + a.status}><span className={'dot ' + a.status} />{STL[a.status]}</span></td>}
             <td className="c-note"><NoteSelect a={a} onPick={pickNote} /></td>
             {isSold && <><td>{a.sale}</td><td className="c-date">{fmtDate(a.soldAt)}</td></>}
             <td className="c-act">{rowActs(a)}</td>
@@ -412,6 +418,27 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
     return <>{star}{farm}{sellB}{del}</>
   }
 
+  // toàn bộ account Special + Đã bán (mọi batch) — dùng cho nút copy gộp
+  const spSoldCount = S.accounts.reduce((t, a) => t + (a.status === 'special' || a.status === 'sold' ? 1 : 0), 0)
+  // thẻ tóm tắt theo ngữ cảnh tab (giống dải thống kê của tool 27 thẻ)
+  const sumTiles: { k: string; n: number; l: string }[] = (() => {
+    if (isList) {
+      const c: Record<Status, number> = { farm: 0, special: 0, sold: 0 }
+      visible.forEach(a => c[a.status]++)
+      return [
+        { k: 'list', n: visible.length, l: 'Trong danh sách' },
+        { k: 'farm', n: c.farm, l: 'Farm' },
+        { k: 'special', n: c.special, l: 'Special' },
+        { k: 'sold', n: c.sold, l: 'Đã bán' },
+      ]
+    }
+    const nBatch = new Set(visible.map(a => a.batch)).size
+    const tiles: { k: string; n: number; l: string }[] = [{ k: tab, n: visible.length, l: TITLES[tab] }, { k: 'batch', n: nBatch, l: 'Batch' }]
+    if (isNoteTab) tiles.push({ k: 'note', n: noteChips.length, l: 'Nhóm ghi chú' })
+    if (tab === 'special') { const ne = eventChips.filter(([e]) => e !== '').length; if (ne) tiles.push({ k: 'event', n: ne, l: 'Event' }) }
+    return tiles
+  })()
+
   return (
     <>
       <header className="head">
@@ -435,22 +462,39 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
             <button className={view === 'table' ? 'on' : ''} aria-pressed={view === 'table'} onClick={() => { S.settings.view = 'table'; commit() }}>Bảng</button>
             <button className={view === 'text' ? 'on' : ''} aria-pressed={view === 'text'} title="Hiện từng nhóm trong ô văn bản để bôi đen và Ctrl+C" onClick={() => { S.settings.view = 'text'; commit() }}>Văn bản</button>
           </div>
-          <button className="btn solid" onClick={() => doCopy(ordered, 'tất cả đang hiện')}>Copy tất cả ({ordered.length})</button>
-          {(() => {
-            const n = S.accounts.reduce((t, a) => t + (a.status === 'special' || a.status === 'sold' ? 1 : 0), 0)
-            return <button className="btn" title="Copy toàn bộ account Special và Đã bán (mọi batch, không phụ thuộc bộ lọc)" disabled={!n} onClick={() => doCopy(allSpecialSold(), 'Special + Đã bán')}>Copy Special + Đã bán ({n})</button>
-          })()}
+          {/* một hành động chính theo ngữ cảnh: Danh sách = Xác nhận; còn lại = Copy tất cả */}
+          {isList
+            ? <button className="btn teal" title="Loại Special và Đã bán khỏi Danh sách, chỉ giữ Farm, rồi tải .zip Farm" onClick={doConfirm}>Xác nhận và xuất Farm</button>
+            : <button className="btn solid" onClick={() => doCopy(ordered, 'tất cả đang hiện')}>Copy tất cả ({ordered.length})</button>}
+          {isList && <button className="btn" onClick={() => doCopy(ordered, 'tất cả đang hiện')}>Copy tất cả ({ordered.length})</button>}
+          {canAdd && <button className="btn" aria-expanded={adding} title="Thêm account vào batch (bù batch bị lẻ)" onClick={() => setAdding(v => !v)}>Thêm account</button>}
           <div className="menu-wrap">
-            <button className="btn" aria-haspopup="menu" onClick={() => setMenu(m => !m)}>Xuất file</button>
-            <div className="menu" role="menu" hidden={!menu}>
+            <button className="btn" aria-haspopup="menu" aria-expanded={openMenu === 'export'} onClick={() => setOpenMenu(o => o === 'export' ? null : 'export')}>Xuất file</button>
+            <div className="menu" role="menu" hidden={openMenu !== 'export'}>
               {exportItems().map(([a, l]) => <button key={a} className="menu-i" role="menuitem" onClick={() => exportAct(a)}>{l}</button>)}
             </div>
           </div>
-          {tab === 'special' && <button className="btn" title="Tìm account Special trùng tên tài khoản và tick sẵn các bản dư" onClick={checkDup}>Kiểm tra trùng</button>}
-          {canAdd && <button className="btn" aria-expanded={adding} title="Thêm account vào batch (bù batch bị lẻ)" onClick={() => setAdding(v => !v)}>Thêm account</button>}
-          {isList && <button className="btn teal" title="Loại Special và Đã bán khỏi Danh sách, chỉ giữ Farm, rồi tải .zip Farm" onClick={doConfirm}>Xác nhận và xuất Farm</button>}
+          <div className="menu-wrap">
+            <button className="btn ghost" aria-haspopup="menu" aria-label="Thao tác khác" aria-expanded={openMenu === 'more'} onClick={() => setOpenMenu(o => o === 'more' ? null : 'more')}>Khác ▾</button>
+            <div className="menu" role="menu" hidden={openMenu !== 'more'}>
+              {isNoteTab && <button className="menu-i" role="menuitem" disabled={!ordered.length} onClick={() => { setOpenMenu(null); doCopyNote(ordered, 'tất cả đang hiện') }}>Copy tất cả kèm ghi chú ({ordered.length})</button>}
+              <button className="menu-i" role="menuitem" disabled={!spSoldCount} onClick={() => { setOpenMenu(null); doCopy(allSpecialSold(), 'Special + Đã bán') }}>Copy Special + Đã bán ({spSoldCount})</button>
+              {spSoldCount > 0 && <button className="menu-i" role="menuitem" onClick={() => { setOpenMenu(null); doCopyNote(allSpecialSold(), 'Special + Đã bán') }}>Copy Special + Đã bán kèm ghi chú ({spSoldCount})</button>}
+              {tab === 'special' && <button className="menu-i" role="menuitem" onClick={() => { setOpenMenu(null); checkDup() }}>Kiểm tra trùng</button>}
+            </div>
+          </div>
         </div>
       </header>
+      {visible.length > 0 && (
+        <div className="acc-sum" role="group" aria-label="Tóm tắt">
+          {sumTiles.map(t => (
+            <div key={t.l} className={'sum-card s-' + t.k}>
+              <span className="sum-n">{t.n}</span>
+              <span className="sum-l">{(t.k === 'farm' || t.k === 'special' || t.k === 'sold') && <span className={'dot ' + t.k} />}{t.l}</span>
+            </div>
+          ))}
+        </div>
+      )}
       {canAdd && adding && (
         <AddPanel fb={fb} onClose={() => setAdding(false)}
           onDone={(b, msg) => { toast(msg); if (b) { commit(); setAdding(false) } }} />
