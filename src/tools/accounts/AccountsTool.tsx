@@ -13,7 +13,7 @@ export default function AccountsTool({ toast }: { toast: (m: string) => void }) 
   const [sel, setSel] = useState<Set<number>>(() => new Set())
   const [limit, setLimit] = useState(PAGE)
   const [q, setQ] = useState('')
-  const [fb, setFb] = useState<BatchFilter>('all') // lọc batch
+  const [fb, setFb] = useState<BatchFilter>(() => new Set()) // lọc batch (rỗng = tất cả)
   const [fs, setFs] = useState<StatusFilter>('all') // lọc trạng thái (tab Danh sách)
   const [fn, setFn] = useState<Set<string>>(() => new Set()) // lọc ghi chú (tab Special / Đã bán), rỗng = tất cả
   const [fe, setFe] = useState<string | null>(null) // lọc event (tab Special / Đã bán); null = tất cả
@@ -36,7 +36,7 @@ export default function AccountsTool({ toast }: { toast: (m: string) => void }) 
   const s = dq.trim().toLowerCase()
   // sắp theo batch (ổn định) để account thêm/chuyển vào batch cũ vẫn nằm đúng nhóm
   const visible = S.accounts.filter(a =>
-    inScope(a) && (fb === 'all' || a.batch === fb) &&
+    inScope(a) && (fb.size === 0 || fb.has(a.batch)) &&
     (!isNoteTab || fn.size === 0 || fn.has((a.note || '').trim())) &&
     (!isNoteTab || fe === null || (a.event || '') === fe) &&
     (!s || a.raw.toLowerCase().includes(s) || (a.note || '').toLowerCase().includes(s)))
@@ -87,7 +87,7 @@ export default function AccountsTool({ toast }: { toast: (m: string) => void }) 
         )}
         <div className="acc-main">
           {tab === 'tools'
-            ? <ImportExport ctx={ctx} onRestored={() => { setSel(new Set()); setFb('all'); setFs('all') }} />
+            ? <ImportExport ctx={ctx} onRestored={() => { setSel(new Set()); setFb(new Set()); setFs('all') }} />
             : <ListPage ctx={ctx} />}
         </div>
       </div>

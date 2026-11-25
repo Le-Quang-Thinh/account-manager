@@ -105,7 +105,7 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
   } else {
     let cb: number | null = null, cur: GroupBlock | null = null, pos = 0
     for (const a of visible) {
-      if (a.batch !== cb) { cb = a.batch; pos = 0; cur = null; if (fb === 'all') blocks.push({ t: 'bh', key: 'bh' + cb, b: cb }) }
+      if (a.batch !== cb) { cb = a.batch; pos = 0; cur = null; if (fb.size !== 1) blocks.push({ t: 'bh', key: 'bh' + cb, b: cb }) }
       if (pos % G === 0) {
         const g = pos / G
         cur = { t: 'g', key: `g${cb}:${g}`, b: cb, g, from: pos + 1, to: Math.min(pos + G, totals[cb]), items: [] }
@@ -177,7 +177,7 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
     const dups = [...groups.values()].filter(g => g.length > 1)
     if (!dups.length) { toast('Không có account Special nào bị trùng.'); return }
     const extra = dups.flatMap(g => g.slice(1))
-    setFb('all'); setFn(new Set()); setQ('')
+    setFb(new Set()); setFn(new Set()); setQ('')
     setSel(new Set(extra.map(a => a.id)))
     const names = dups.slice(0, 5).map(g => `${g[0].user} (${g.length})`).join(', ')
     toast(`Có ${dups.length} account Special bị trùng (${extra.length} bản dư, đã tick sẵn): ${names}${dups.length > 5 ? '…' : ''}`)
@@ -215,7 +215,7 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
       if (fn.size && !fn.has((a.note || '').trim())) return false
       if (fe !== null && (a.event || '') !== fe) return false
     }
-    return fb === 'all' || a.batch === fb
+    return fb.size === 0 || fb.has(a.batch)
   })
   const exportAct = (act: string) => {
     setOpenMenu(null)
@@ -239,7 +239,7 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
   const eventChips = isNoteTab
     ? (() => {
         const m = new Map<string, number>()
-        S.accounts.filter(a => a.status === tab && (fb === 'all' || a.batch === fb))
+        S.accounts.filter(a => a.status === tab && (fb.size === 0 || fb.has(a.batch)))
           .forEach(a => { const e = a.event || ''; m.set(e, (m.get(e) || 0) + 1) })
         return [...m.entries()].sort((x, y) => ((x[0] === '' ? 1 : 0) - (y[0] === '' ? 1 : 0)) || x[0].localeCompare(y[0], 'vi'))
       })()
@@ -253,7 +253,7 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
   }, [tab, hasEvents])
   // các ghi chú đang có trong tab (theo batch + event đang lọc), kèm số account
   const noteChips = isNoteTab
-    ? noteGroups(S.accounts.filter(a => a.status === tab && (fb === 'all' || a.batch === fb) && (fe === null || (a.event || '') === fe))).map(g => ({ note: g.note, n: g.items.length }))
+    ? noteGroups(S.accounts.filter(a => a.status === tab && (fb.size === 0 || fb.has(a.batch)) && (fe === null || (a.event || '') === fe))).map(g => ({ note: g.note, n: g.items.length }))
     : []
   const toggleNote = (note: string) => {
     const n = new Set(fn)
@@ -402,7 +402,7 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
     if (q.trim()) return <div className="empty"><h2>Không có account nào khớp</h2><p>Không thấy kết quả cho “{q.trim()}”. Xoá từ khoá để xem lại toàn bộ danh sách.</p><button className="btn solid" onClick={() => setQ('')}>Xoá tìm kiếm</button></div>
     if (tab === 'special') return <div className="empty"><h2>Chưa có account Special</h2><p>Vào tab Farm, chọn ghi chú để chuyển account sang đây.</p><button className="btn solid" onClick={() => goTab('farm')}>Mở Farm</button></div>
     if (tab === 'sold') return <div className="empty"><h2>Chưa bán account nào</h2><p>Khi bán xong, bấm Bán ở account trong tab Special để ghi nhận.</p><button className="btn solid" onClick={() => goTab('special')}>Mở Special</button></div>
-    if (fb !== 'all' || fs !== 'all') return <div className="empty"><h2>Không có account trong bộ lọc này</h2><p>Chọn batch hoặc trạng thái khác ở thanh bên.</p><button className="btn solid" onClick={() => { setFb('all') }}>Xem tất cả batch</button></div>
+    if (fb.size > 0 || fs !== 'all') return <div className="empty"><h2>Không có account trong bộ lọc này</h2><p>Chọn batch hoặc trạng thái khác ở thanh bên.</p><button className="btn solid" onClick={() => { setFb(new Set()) }}>Xem tất cả batch</button></div>
     return <div className="empty"><h2>Chưa có account nào</h2><p>Dán danh sách account ở tab Nhập / Xuất. Mỗi lần nhập tạo một batch mới.</p><button className="btn solid" onClick={() => goTab('tools')}>Nhập account</button></div>
   }
 
@@ -444,7 +444,7 @@ export default function ListPage({ ctx }: { ctx: Ctx }) {
       <header className="head">
         <div>
           <h1>{TITLES[tab]}</h1>
-          <p className="sub"><b>{ordered.length}</b> account{fb === 'all' ? '' : ` trong ${uiBatch(fb)}`}</p>
+          <p className="sub"><b>{ordered.length}</b> account{fb.size === 0 ? '' : fb.size === 1 ? ` trong ${uiBatch([...fb][0])}` : ` trong ${fb.size} batch`}</p>
         </div>
         <div className="head-c">
           <input className="search" type="search" placeholder="Tìm tài khoản hoặc ghi chú" aria-label="Tìm tài khoản hoặc ghi chú"

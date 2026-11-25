@@ -35,7 +35,7 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
     save()
     if (r.add) {
       goTab('farm')
-      setFb(r.batch ?? 'all')
+      setFb(r.batch != null ? new Set([r.batch]) : new Set())
       setFs('all')
       setSel(new Set())
       commit()
@@ -50,7 +50,7 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
     if (r.created) msg += ` Tạo mới ${r.created} account không có trong danh sách vào ${batchLabel(r.batch!)}.`
     if (r.miss.length) msg += ` Bỏ qua ${r.miss.length} dòng trùng account đã bán (để lại trong ô).`
     setSp(r.miss.join('\n'))
-    if (r.created) { goTab('special'); setFb(r.batch!) } // mở luôn batch unknown để thấy account vừa tạo
+    if (r.created) { goTab('special'); setFb(new Set([r.batch!])) } // mở luôn batch unknown để thấy account vừa tạo
     toast(msg)
   }
   const doSell = () => {
@@ -133,7 +133,7 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
     const names = delIds.map(b => 'Batch ' + b).join(', ')
     if (!confirm(`Xoá hẳn ${delIds.length} batch (${names}) gồm ${delN} account? Account sẽ mất hoàn toàn khỏi mọi tab, kể cả Special và Đã bán.`)) return
     const n = deleteBatches(delIds)
-    setDelSel(new Set()); setFb('all'); setSel(new Set()); commit()
+    setDelSel(new Set()); setFb(new Set()); setSel(new Set()); commit()
     toast(`Đã xoá ${delIds.length} batch, ${n} account.`)
   }
   const mrgIds = bids.filter(b => mrgSel.has(b)) // bỏ batch đã biến mất
@@ -147,7 +147,7 @@ export default function ImportExport({ ctx, onRestored }: { ctx: Ctx; onRestored
     if (!confirm(`Gộp ${mrgIds.length} batch (${mrgN} account) vào ${into}?` + (mrgDedupe ? '\nAccount trùng tên tài khoản sẽ bị bỏ bớt, giữ bản nhiều thông tin nhất (Đã bán > Special > Farm).' : ''))) return
     const r = mergeBatches(mrgIds, effTarget, mrgDedupe, mrgName)
     setMrgSel(new Set()); setMrgTarget(0); setMrgName('')
-    setFb(r.target ?? 'all'); setSel(new Set()); commit()
+    setFb(r.target != null ? new Set([r.target]) : new Set()); setSel(new Set()); commit()
     let msg = `Đã gộp ${r.sources} batch vào ${batchLabel(r.target!)}: dồn ${r.moved} account.`
     if (mrgDedupe) msg += r.removed ? ` Bỏ ${r.removed} account trùng tên.` : ' Không có account trùng tên.'
     toast(msg)

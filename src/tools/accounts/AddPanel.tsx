@@ -12,7 +12,7 @@ interface Props {
 export default function AddPanel({ fb, onClose, onDone }: Props) {
   const ids = batchIds()
   const target = S.settings.group
-  const initial = typeof fb === 'number' ? fb : (ids.find(b => { const n = farmCount(b); return n > 0 && n < target }) ?? 0)
+  const initial = fb.size === 1 ? [...fb][0] : (ids.find(b => { const n = farmCount(b); return n > 0 && n < target }) ?? 0)
   const [batch, setBatch] = useState(initial)
   const [text, setText] = useState('')
   const lines = text.split(/\r?\n/).filter(l => l.trim()).length

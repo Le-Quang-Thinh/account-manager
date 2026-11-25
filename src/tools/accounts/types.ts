@@ -1,6 +1,6 @@
 export type Status = 'farm' | 'special' | 'sold'
 export type Tab = 'list' | 'farm' | 'special' | 'sold' | 'tools'
-export type BatchFilter = 'all' | number
+export type BatchFilter = Set<number> // tập batch đang chọn; rỗng = tất cả batch
 export type StatusFilter = 'all' | Status
 
 export interface Account {
